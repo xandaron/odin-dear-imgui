@@ -63,7 +63,6 @@ get_allocator :: proc() -> mem.Allocator {
 	return INTERNAL_ALLOCATOR
 }
 
-@(private = "package")
 Vector :: struct($T: typeid) {
 	Size:     i32,
 	Capacity: i32,
