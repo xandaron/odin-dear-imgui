@@ -63,6 +63,7 @@ get_allocator :: proc() -> mem.Allocator {
 	return INTERNAL_ALLOCATOR
 }
 
+// Could this be replaced with [dynamic]T?
 Vector :: struct($T: typeid) {
 	Size:     i32,
 	Capacity: i32,
