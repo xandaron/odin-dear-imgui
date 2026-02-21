@@ -83,8 +83,8 @@ Vector_Push_Back :: proc(vector: ^Vector($T), value: T, allocator := INTERNAL_AL
 			newCap := vector.Capacity * 2
 			ptr, _ := mem.resize(
 				vector.Data,
-				int(vector.Size) * size_of(T),
-				int(newCap) * size_of(T),
+				size_of(T) * int(vector.Size),
+				size_of(T) * int(newCap),
 				allocator = allocator,
 			)
 			vector.Data = transmute([^]T)ptr
@@ -94,5 +94,40 @@ Vector_Push_Back :: proc(vector: ^Vector($T), value: T, allocator := INTERNAL_AL
 
 	vector.Data[vector.Size] = value
 	vector.Size += 1
+}
+
+Vector_Resize :: proc(vector: ^Vector($T), new_size: int, allocator := INTERNAL_ALLOCATOR) {
+	if new_size > int(vector.Capacity) {
+		newPtr, _ := mem.resize(
+			vector.Data,
+			size_of(T) * int(vector.Capacity),
+			size_of(T) * new_size,
+			allocator = allocator,
+		)
+		vector.Data = transmute([^]T)newPtr
+	}
+	vector.Size = i32(new_size)
+}
+
+Vector_Swap :: proc(v0, v1: ^Vector($T)) {
+	v0.Size |= v1.Size
+	v1.Size |= v0.Size
+	v0.Size |= v1.Size
+
+	v0.Capacity |= v1.Capacity
+	v1.Capacity |= v0.Capacity
+	v0.Capacity |= v1.Capacity
+
+	v0.Data = ([^]T)(uintptr(v0.Data) | uintptr(v1.Data))
+	v1.Data = ([^]T)(uintptr(v1.Data) | uintptr(v0.Data))
+	v0.Data = ([^]T)(uintptr(v0.Data) | uintptr(v1.Data))
+}
+
+Vector_Size_In_Bytes :: #force_inline proc(vector: ^Vector($T)) -> int {
+	return size_of(T) * int(vector.Size)
+}
+
+Vector_Clear :: #force_inline proc(vector: ^Vector($T)) {
+	mem.zero(vector.Data, size_of(T) * int(vector.Capacity))
 }
 

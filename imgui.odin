@@ -3092,6 +3092,7 @@ foreign lib {
 ////////////////////////////////////////////////////////////
 
 DrawIdx :: c.ushort // Default: 16-bit (for maximum compatibility with renderer backends)
+
 // Scalar data types
 ID       :: c.uint // A unique ID used by widgets (typically the result of hashing a stack of string)
 KeyChord :: c.int  // -> ImGuiKey | ImGuiMod_XXX    // Flags: for IsKeyChordPressed(), Shortcut() etc. an ImGuiKey optionally OR-ed with one or more ImGuiMod_XXX values.
@@ -3105,9 +3106,18 @@ Wchar   :: Wchar16
 // - Most users are likely to use this store an item INDEX but this may be used to store a POINTER/ID as well. Read comments near ImGuiMultiSelectIO for details.
 SelectionUserData :: i64
 // Callback and functions types
-InputTextCallback :: proc "c" (data: ^InputTextCallbackData) -> c.int     // Callback function for ImGui::InputText()
-SizeCallback      :: proc "c" (data: ^SizeCallbackData)                   // Callback function for ImGui::SetNextWindowSizeConstraints()
-MemAllocFunc      :: proc "c" (sz: c.size_t, user_data: rawptr) -> rawptr // Function signature for ImGui::SetAllocatorFunctions()
-MemFreeFunc       :: proc "c" (ptr: rawptr, user_data: rawptr)            // Function signature for ImGui::SetAllocatorFunctions()
+InputTextCallback :: #type proc "c" (data: ^InputTextCallbackData) -> c.int     // Callback function for ImGui::InputText()
+SizeCallback      :: #type proc "c" (data: ^SizeCallbackData)                   // Callback function for ImGui::SetNextWindowSizeConstraints()
+MemAllocFunc      :: #type proc "c" (sz: c.size_t, user_data: rawptr) -> rawptr // Function signature for ImGui::SetAllocatorFunctions()
+MemFreeFunc       :: #type proc "c" (ptr: rawptr, user_data: rawptr)            // Function signature for ImGui::SetAllocatorFunctions()
 TextureID         :: u64                                                  // Default: store up to 64-bits (any pointer or integer). A majority of backends are ok with that.
-DrawCallback      :: proc "c" (parent_list: ^DrawList, cmd: ^DrawCmd)
+TextureID_Invalid :: TextureID(0)
+DrawCallback      :: #type proc "c" (parent_list: ^DrawList, cmd: ^DrawCmd)
+
+// Special Draw callback value to request renderer backend to reset the graphics/render state.
+// The renderer backend needs to handle this special value, otherwise it will crash trying to call a function at this address.
+// This is useful, for example, if you submitted callbacks which you know have altered the render state and you want it to be restored.
+// Render state is not reset by default because they are many perfectly useful way of altering render state (e.g. changing shader/blending settings before an Image call).
+DrawCallback_ResetRenderState :: ~uintptr(7)
+// https://github.com/odin-lang/Odin/issues/6315
+// DrawCallback_ResetRenderState :: transmute(DrawCallback)(~uintptr(7))
