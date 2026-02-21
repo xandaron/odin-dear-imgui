@@ -1,0 +1,98 @@
+package imgui
+
+import "core:log"
+import "core:mem"
+
+
+@(private = "package")
+imgui_allocator_proc :: proc(
+	allocator_data: rawptr,
+	mode: mem.Allocator_Mode,
+	size, alignment: int,
+	old_memory: rawptr,
+	old_size: int,
+	location := #caller_location,
+) -> (
+	[]byte,
+	mem.Allocator_Error,
+) {
+	alloc_size :: proc(size, alignment: int) -> int {
+		return size + alignment - (size % alignment)
+	}
+
+	alloc_mem :: proc(size, alignment: int) -> rawptr {
+		return MemAlloc(uint(alloc_size(size, alignment)))
+	}
+
+	free_mem :: proc(old_memory: rawptr) {
+		MemFree(old_memory)
+	}
+
+	#partial switch mode {
+	case .Free:
+		free_mem(old_memory)
+		return nil, .None
+	case .Alloc_Non_Zeroed:
+		ptr := alloc_mem(size, alignment)
+		return (transmute([^]byte)ptr)[:size], .None
+	case .Alloc:
+		ptr := alloc_mem(size, alignment)
+		mem.zero(ptr, alloc_size(size, alignment))
+		return (transmute([^]byte)ptr)[:size], .None
+	case .Resize_Non_Zeroed:
+		ptr := alloc_mem(size, alignment)
+		mem.copy(ptr, old_memory, old_size)
+		free_mem(old_memory)
+		return (transmute([^]byte)ptr)[:size], .None
+	case .Resize:
+		ptr := alloc_mem(size, alignment)
+		mem.copy(ptr, old_memory, old_size)
+		free_mem(old_memory)
+		mem.zero(rawptr(uintptr(ptr) + uintptr(old_size)), alloc_size(size, alignment) - old_size)
+		return (transmute([^]byte)ptr)[:size], .None
+	case:
+		return nil, .Mode_Not_Implemented
+	}
+	panic("Unreachable!")
+}
+
+@(private = "package")
+INTERNAL_ALLOCATOR: mem.Allocator : {data = nil, procedure = imgui_allocator_proc}
+
+get_allocator :: proc() -> mem.Allocator {
+	return INTERNAL_ALLOCATOR
+}
+
+@(private = "package")
+Vector :: struct($T: typeid) {
+	Size:     i32,
+	Capacity: i32,
+	Data:     [^]T,
+}
+
+// We have to alloc using imgui's alloc methods as the vector objects
+// belong to it. Default to using the non tracking allocator as
+// C++ will handle cleanup for us.
+Vector_Push_Back :: proc(vector: ^Vector($T), value: T, allocator := INTERNAL_ALLOCATOR) {
+	if vector.Size == vector.Capacity {
+		if vector.Capacity == 0 {
+			ptr, _ := mem.alloc(size_of(T), allocator = allocator)
+			vector.Data = transmute([^]T)ptr
+			vector.Capacity = 1
+		} else {
+			newCap := vector.Capacity * 2
+			ptr, _ := mem.resize(
+				vector.Data,
+				int(vector.Size) * size_of(T),
+				int(newCap) * size_of(T),
+				allocator = allocator,
+			)
+			vector.Data = transmute([^]T)ptr
+			vector.Capacity = newCap
+		}
+	}
+
+	vector.Data[vector.Size] = value
+	vector.Size += 1
+}
+
