@@ -3,6 +3,60 @@ package imgui
 import "core:mem"
 
 
+@(private = "package")
+imgui_allocator_proc :: proc(
+	allocator_data: rawptr,
+	mode: mem.Allocator_Mode,
+	size, alignment: int,
+	old_memory: rawptr,
+	old_size: int,
+	location := #caller_location,
+) -> (
+	[]byte,
+	mem.Allocator_Error,
+) {
+	alloc_size :: proc(size, alignment: int) -> int {
+		return (size + alignment - 1) & ~(alignment - 1)
+	}
+
+	alloc_mem :: proc(size, alignment: int) -> rawptr {
+		return MemAlloc(uint(alloc_size(size, alignment)))
+	}
+
+	free_mem :: proc(old_memory: rawptr) {
+		MemFree(old_memory)
+	}
+
+	#partial switch mode {
+	case .Free:
+		free_mem(old_memory)
+		return nil, .None
+	case .Alloc_Non_Zeroed:
+		ptr := alloc_mem(size, alignment)
+		return (transmute([^]byte)ptr)[:size], .None
+	case .Alloc:
+		ptr := alloc_mem(size, alignment)
+		mem.zero(ptr, alloc_size(size, alignment))
+		return (transmute([^]byte)ptr)[:size], .None
+	case .Resize_Non_Zeroed:
+		ptr := alloc_mem(size, alignment)
+		mem.copy(ptr, old_memory, old_size)
+		free_mem(old_memory)
+		return (transmute([^]byte)ptr)[:size], .None
+	case .Resize:
+		ptr := alloc_mem(size, alignment)
+		mem.copy(ptr, old_memory, old_size)
+		free_mem(old_memory)
+		mem.zero(rawptr(uintptr(ptr) + uintptr(old_size)), alloc_size(size, alignment) - old_size)
+		return (transmute([^]byte)ptr)[:size], .None
+	case:
+		return nil, .Mode_Not_Implemented
+	}
+	panic("Unreachable!")
+}
+
+INTERNAL_ALLOCATOR: mem.Allocator : {data = nil, procedure = imgui_allocator_proc}
+
 // Could this be replaced with [dynamic]T?
 Vector :: struct($T: typeid) {
 	Size:     i32,
