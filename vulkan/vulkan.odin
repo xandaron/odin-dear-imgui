@@ -287,7 +287,7 @@ Shutdown :: proc() {
 	io.BackendRendererName = nil
 	io.BackendRendererUserData = nil
 	io.BackendFlags -= {.RendererHasVtxOffset, .RendererHasTextures, .RendererHasViewports}
-	imgui.PlatformIO_ClearPlatformHandlers(platform_io)
+	imgui.PlatformIO_ClearRendererHandlers(platform_io)
 	free(bd, internal_allocator)
 }
 
