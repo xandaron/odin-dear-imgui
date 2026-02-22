@@ -65,7 +65,7 @@ MouseButtonCallback :: proc "c" (window: glfw.WindowHandle, button, action, mods
 
 	io := imgui.GetIOImGuiContextPtr(bd.Context)
 	UpdateKeyModifiers(io, window)
-	if button >= 0 && button < transmute(i32)imgui.MouseButton.COUNT {
+	if button >= 0 && button < i32(imgui.MouseButton.COUNT) {
 		imgui.IO_AddMouseButtonEvent(io, button, action == glfw.PRESS)
 	}
 }
@@ -262,20 +262,16 @@ Shutdown :: proc() {
 		// Windows: restore our WndProc hook
 		main_viewport := imgui.GetMainViewport()
 		windows.SetPropW(
-			transmute(windows.HWND)main_viewport.PlatformHandleRaw,
+			windows.HWND(main_viewport.PlatformHandleRaw),
 			"IMGUI_BACKEND_DATA",
 			nil,
 		)
 		windows.SetWindowLongPtrW(
-			transmute(windows.HWND)main_viewport.PlatformHandleRaw,
+			windows.HWND(main_viewport.PlatformHandleRaw),
 			windows.GWLP_WNDPROC,
-			transmute(windows.LONG_PTR)bd.PrevWndProc,
+			transmute(windows.LONG_PTR)(bd.PrevWndProc),
 		)
 		bd.PrevWndProc = nil
-	} else when X11 {
-		if (bd.X11Module != nil) {
-			// dlclose(bd.X11Module)
-		}
 	}
 
 	io.BackendPlatformName = nil
@@ -288,8 +284,7 @@ Shutdown :: proc() {
 		.HasMouseHoveredViewport,
 	}
 	imgui.PlatformIO_ClearPlatformHandlers(platform_io)
-	imgui.DestroyContext(bd.Context)
-	ContextMap[bd.Window] = nil
+	delete_key(&ContextMap, bd.Window)
 	free(bd, internal_allocator)
 }
 

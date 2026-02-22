@@ -59,7 +59,7 @@ Init :: proc(
 	bd := new(Data, internal_allocator)
 	fmt.bprintf(bd.BackendPlatformName[:], "imgui_impl_glfw (%d)", GLFW_VERSION_COMBINED)
 	io.BackendPlatformUserData = bd
-	io.BackendPlatformName = transmute(cstring)(&bd.BackendPlatformName[0])
+	io.BackendPlatformName = cstring(&bd.BackendPlatformName[0])
 	io.BackendFlags += {.HasMouseCursors, .HasSetMousePos}
 
 	bd.IsWayland = glfw.GetPlatform() == glfw.PLATFORM_WAYLAND
@@ -137,8 +137,8 @@ Init :: proc(
 
 	// Windows: register a WndProc hook so we can intercept some messages.
 	when ODIN_OS == .Windows {
-		hwnd := transmute(windows.HWND)main_viewport.PlatformHandleRaw
-		windows.SetPropW(hwnd, "IMGUI_BACKEND_DATA", transmute(windows.HANDLE)bd)
+		hwnd := windows.HWND(main_viewport.PlatformHandleRaw)
+		windows.SetPropW(hwnd, "IMGUI_BACKEND_DATA", windows.HANDLE(bd))
 		bd.PrevWndProc = transmute(windows.WNDPROC)windows.GetWindowLongPtrW(
 			hwnd,
 			windows.GWLP_WNDPROC,
@@ -154,13 +154,13 @@ Init :: proc(
 // Get data for current context
 GetBackendDataNoWindow :: proc() -> ^Data {
 	return(
-		imgui.GetCurrentContext() != nil ? transmute(^Data)imgui.GetIO().BackendPlatformUserData : nil \
+		imgui.GetCurrentContext() != nil ? (^Data)(imgui.GetIO().BackendPlatformUserData) : nil \
 	)
 }
 
 // Get data for a given GLFW window, regardless of current context (since GLFW events are sent together)
 GetBackendDataWindow :: proc(window: glfw.WindowHandle) -> ^Data {
-	return transmute(^Data)imgui.GetIOImGuiContextPtr(ContextMap[window]).BackendPlatformUserData
+	return (^Data)(imgui.GetIOImGuiContextPtr(ContextMap[window]).BackendPlatformUserData)
 }
 
 GetBackendData :: proc {
@@ -500,7 +500,7 @@ UpdateMouseData :: proc() {
 	mouse_pos_prev := io.MousePos
 	for n: i32 = 0; n < platform_io.Viewports.Size; n += 1 {
 		viewport := platform_io.Viewports.Data[n]
-		window := transmute(glfw.WindowHandle)(viewport.PlatformHandle)
+		window := glfw.WindowHandle(viewport.PlatformHandle)
 
 		is_window_focused := glfw.GetWindowAttrib(window, glfw.FOCUSED) != 0
 		if is_window_focused {
@@ -564,7 +564,7 @@ UpdateMouseCursor :: proc() {
 	imgui_cursor := imgui.GetMouseCursor()
 	platform_io := imgui.GetPlatformIO()
 	for n: i32 = 0; n < platform_io.Viewports.Size; n += 1 {
-		window := transmute(glfw.WindowHandle)(platform_io.Viewports.Data[n].PlatformHandle)
+		window := glfw.WindowHandle(platform_io.Viewports.Data[n].PlatformHandle)
 		if imgui_cursor == .None || io.MouseDrawCursor {
 			if bd.LastMouseCursor != nil {
 				// Hide OS mouse cursor if imgui is drawing it or if it wants no cursor
@@ -765,7 +765,7 @@ WindowCloseCallback :: proc "c" (window: glfw.WindowHandle) {
 // ignore recent glfwSetWindowXXX() calls.
 WindowPosCallback :: proc "c" (window: glfw.WindowHandle, _, _: i32) {
 	if viewport := imgui.FindViewportByPlatformHandle(window); viewport != nil {
-		if vd := transmute(^ViewportData)viewport.PlatformUserData; vd != nil {
+		if vd := (^ViewportData)(viewport.PlatformUserData); vd != nil {
 			//data->IgnoreWindowPosEventFrame = -1;
 			if imgui.GetFrameCount() <= vd.IgnoreWindowPosEventFrame + 1 {
 				return
@@ -777,7 +777,7 @@ WindowPosCallback :: proc "c" (window: glfw.WindowHandle, _, _: i32) {
 
 WindowSizeCallback :: proc "c" (window: glfw.WindowHandle, _, _: i32) {
 	if viewport := imgui.FindViewportByPlatformHandle(window); viewport != nil {
-		if vd := transmute(^ViewportData)viewport.PlatformUserData; vd != nil {
+		if vd := (^ViewportData)(viewport.PlatformUserData); vd != nil {
 			//data->IgnoreWindowSizeEventFrame = -1;
 			if imgui.GetFrameCount() <= vd.IgnoreWindowSizeEventFrame + 1 {
 				return
@@ -823,9 +823,9 @@ CreateWindow :: proc "cdecl" (viewport: ^imgui.Viewport) {
 	when ODIN_OS == .Windows {
 		viewport.PlatformHandleRaw = glfw.GetWin32Window(vd.Window)
 		windows.SetPropW(
-			transmute(windows.HWND)viewport.PlatformHandleRaw,
+			windows.HWND(viewport.PlatformHandleRaw),
 			"IMGUI_BACKEND_DATA",
-			transmute(windows.HANDLE)bd,
+			windows.HANDLE(bd),
 		)
 	} else when ODIN_OS == .Darwin {
 		viewport.PlatformHandleRaw = glfw.GetCocoaWindow(vd.Window)
@@ -853,10 +853,10 @@ CreateWindow :: proc "cdecl" (viewport: ^imgui.Viewport) {
 DestroyWindow :: proc "cdecl" (viewport: ^imgui.Viewport) {
 	context = runtime.default_context()
 	bd := GetBackendData()
-	if vd := transmute(^ViewportData)viewport.PlatformUserData; vd != nil {
+	if vd := (^ViewportData)(viewport.PlatformUserData); vd != nil {
 		if vd.WindowOwned {
 			when ODIN_OS == .Windows {
-				hwnd := transmute(windows.HWND)viewport.PlatformHandleRaw
+				hwnd := windows.HWND(viewport.PlatformHandleRaw)
 				windows.RemovePropW(hwnd, "IMGUI_VIEWPORT")
 			}
 
@@ -869,8 +869,7 @@ DestroyWindow :: proc "cdecl" (viewport: ^imgui.Viewport) {
 				}
 			}
 
-			free(ContextMap[vd.Window], internal_allocator)
-			ContextMap[vd.Window] = nil
+			delete_key(&ContextMap, vd.Window)
 			glfw.DestroyWindow(vd.Window)
 		}
 		vd.Window = nil
@@ -881,20 +880,20 @@ DestroyWindow :: proc "cdecl" (viewport: ^imgui.Viewport) {
 }
 
 ShowWindow :: proc "cdecl" (viewport: ^imgui.Viewport) {
-	vd := transmute(^ViewportData)viewport.PlatformUserData
+	vd := (^ViewportData)(viewport.PlatformUserData)
 
 	when ODIN_OS == .Windows {
 		// GLFW hack: Hide icon from task bar
-		hwnd := transmute(windows.HWND)viewport.PlatformHandleRaw
+		hwnd := windows.HWND(viewport.PlatformHandleRaw)
 		if .NoTaskBarIcon in viewport.Flags {
 			ex_style := windows.GetWindowLongW(hwnd, windows.GWL_EXSTYLE)
-			ex_style &= transmute(i32)~windows.WS_EX_APPWINDOW
-			ex_style |= transmute(i32)windows.WS_EX_TOOLWINDOW
+			ex_style &= transmute(i32)(~windows.WS_EX_APPWINDOW)
+			ex_style |= i32(windows.WS_EX_TOOLWINDOW)
 			windows.SetWindowLongW(hwnd, windows.GWL_EXSTYLE, ex_style)
 		}
 
 		// GLFW hack: install WndProc for mouse source event and WM_NCHITTEST message handler.
-		windows.SetPropW(hwnd, "IMGUI_VIEWPORT", transmute(windows.HANDLE)viewport)
+		windows.SetPropW(hwnd, "IMGUI_VIEWPORT", windows.HANDLE(viewport))
 		vd.PrevWndProc = transmute(windows.WNDPROC)windows.GetWindowLongPtrW(
 			hwnd,
 			windows.GWLP_WNDPROC,
@@ -906,59 +905,59 @@ ShowWindow :: proc "cdecl" (viewport: ^imgui.Viewport) {
 }
 
 GetWindowPos :: proc "cdecl" (viewport: ^imgui.Viewport) -> imgui.Vec2 {
-	vd := transmute(^ViewportData)viewport.PlatformUserData
+	vd := (^ViewportData)(viewport.PlatformUserData)
 	x, y := glfw.GetWindowPos(vd.Window)
 	return {f32(x), f32(y)}
 }
 
 SetWindowPos :: proc "cdecl" (viewport: ^imgui.Viewport, pos: imgui.Vec2) {
-	vd := transmute(^ViewportData)viewport.PlatformUserData
+	vd := (^ViewportData)(viewport.PlatformUserData)
 	vd.IgnoreWindowPosEventFrame = imgui.GetFrameCount()
 	glfw.SetWindowPos(vd.Window, i32(pos.x), i32(pos.y))
 }
 
 GetWindowSize :: proc "cdecl" (viewport: ^imgui.Viewport) -> imgui.Vec2 {
-	vd := transmute(^ViewportData)viewport.PlatformUserData
+	vd := (^ViewportData)(viewport.PlatformUserData)
 	w, h := glfw.GetWindowSize(vd.Window)
 	return {f32(w), f32(h)}
 }
 
 SetWindowSize :: proc "cdecl" (viewport: ^imgui.Viewport, size: imgui.Vec2) {
-	vd := transmute(^ViewportData)viewport.PlatformUserData
+	vd := (^ViewportData)(viewport.PlatformUserData)
 	vd.IgnoreWindowSizeEventFrame = imgui.GetFrameCount()
 	glfw.SetWindowSize(vd.Window, i32(size.x), i32(size.y))
 }
 
 GetWindowFramebufferScale :: proc "cdecl" (viewport: ^imgui.Viewport) -> imgui.Vec2 {
 	context = runtime.default_context()
-	vd := transmute(^ViewportData)viewport.PlatformUserData
+	vd := (^ViewportData)(viewport.PlatformUserData)
 	framebuffer_scale: imgui.Vec2 = ---
 	GetWindowSizeAndFramebufferScale(vd.Window, nil, &framebuffer_scale)
 	return framebuffer_scale
 }
 
 SetWindowTitle :: proc "cdecl" (viewport: ^imgui.Viewport, title: cstring) {
-	vd := transmute(^ViewportData)viewport.PlatformUserData
+	vd := (^ViewportData)(viewport.PlatformUserData)
 	glfw.SetWindowTitle(vd.Window, title)
 }
 
 SetWindowFocus :: proc "cdecl" (viewport: ^imgui.Viewport) {
-	vd := transmute(^ViewportData)viewport.PlatformUserData
+	vd := (^ViewportData)(viewport.PlatformUserData)
 	glfw.FocusWindow(vd.Window)
 }
 
 GetWindowFocus :: proc "cdecl" (viewport: ^imgui.Viewport) -> bool {
-	vd := transmute(^ViewportData)viewport.PlatformUserData
+	vd := (^ViewportData)(viewport.PlatformUserData)
 	return glfw.GetWindowAttrib(vd.Window, glfw.FOCUSED) != 0
 }
 
 GetWindowMinimized :: proc "cdecl" (viewport: ^imgui.Viewport) -> bool {
-	vd := transmute(^ViewportData)viewport.PlatformUserData
+	vd := (^ViewportData)(viewport.PlatformUserData)
 	return glfw.GetWindowAttrib(vd.Window, glfw.ICONIFIED) != 0
 }
 
 SetWindowAlpha :: proc "cdecl" (viewport: ^imgui.Viewport, alpha: f32) {
-	vd := transmute(^ViewportData)viewport.PlatformUserData
+	vd := (^ViewportData)(viewport.PlatformUserData)
 	glfw.SetWindowOpacity(vd.Window, alpha)
 }
 
@@ -968,7 +967,7 @@ RenderWindow :: proc "cdecl" (viewport: ^imgui.Viewport, _: rawptr) {
 		return
 	}
 
-	vd := transmute(^ViewportData)viewport.PlatformUserData
+	vd := (^ViewportData)(viewport.PlatformUserData)
 	glfw.MakeContextCurrent(vd.Window)
 }
 
@@ -978,7 +977,7 @@ SwapBuffers :: proc "cdecl" (viewport: ^imgui.Viewport, _: rawptr) {
 		return
 	}
 
-	vd := transmute(^ViewportData)viewport.PlatformUserData
+	vd := (^ViewportData)(viewport.PlatformUserData)
 	glfw.MakeContextCurrent(vd.Window)
 	glfw.SwapBuffers(vd.Window)
 }
@@ -993,12 +992,12 @@ CreateVkSurface :: proc "cdecl" (
 	vk_allocator: rawptr,
 	out_vk_surface: ^u64,
 ) -> i32 {
-	vd := transmute(^ViewportData)viewport.PlatformUserData
+	vd := (^ViewportData)(viewport.PlatformUserData)
 	err := glfw.CreateWindowSurface(
 		transmute(vk.Instance)vk_instance,
 		vd.Window,
 		transmute(^vk.AllocationCallbacks)vk_allocator,
-		transmute(^vk.SurfaceKHR)(out_vk_surface),
+		(^vk.SurfaceKHR)(out_vk_surface),
 	)
 	return i32(err)
 }
