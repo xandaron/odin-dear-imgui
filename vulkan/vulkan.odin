@@ -29,6 +29,8 @@
 package ImGui_ImplVulkan
 
 import imgui ".."
+
+import "core:mem"
 import vk "vendor:vulkan"
 
 
@@ -199,6 +201,333 @@ Default_Window: Window : {
 		initialLayout  = .UNDEFINED,
 		finalLayout    = .PRESENT_SRC_KHR,
 	},
+}
+
+new_window :: proc() -> ^Window {
+	ptr := new(Window, internal_allocator)
+	ptr^ = Default_Window
+	return ptr
+}
+
+Init :: proc(info: ^InitInfo, allocator := context.allocator) -> bool {
+	imgui.CHECKVERSION()
+	io := imgui.GetIO()
+	assert(io.BackendRendererUserData == nil, "Already initialized a renderer backend!")
+
+	internal_allocator = allocator
+	if info.ApiVersion == 0 {
+		info.ApiVersion = GetDefaultApiVersion()
+	}
+
+	// Setup backend capabilities flags
+	bd := new_data()
+	io.BackendRendererUserData = bd
+	io.BackendRendererName = "imgui_impl_vulkan"
+	// We can honor the ImDrawCmd::VtxOffset field, allowing for large meshes.
+	// We can honor ImGuiPlatformIO::Textures[] requests during render.
+	// We can create multi-viewports on the Renderer side (optional)
+	io.BackendFlags += {.RendererHasVtxOffset, .RendererHasTextures, .RendererHasViewports}
+
+	// Sanity checks
+	assert(info.Instance != nil)
+	assert(info.PhysicalDevice != nil)
+	assert(info.Device != nil)
+	assert(info.Queue != nil)
+	assert(info.MinImageCount >= 2)
+	assert(info.ImageCount >= info.MinImageCount)
+	if info.DescriptorPool != 0 { 	// Either DescriptorPool or DescriptorPoolSize must be set, not both!
+		assert(info.DescriptorPoolSize == 0)
+	} else {
+		assert(info.DescriptorPoolSize > 0)
+	}
+
+	if info.UseDynamicRendering {
+		assert(
+			info.PipelineInfoMain.RenderPass == 0 && info.PipelineInfoForViewports.RenderPass == 0,
+		)
+	}
+	bd.VulkanInitInfo = info^
+
+	properties: vk.PhysicalDeviceProperties
+	vk.GetPhysicalDeviceProperties(info.PhysicalDevice, &properties)
+	bd.NonCoherentAtomSize = properties.limits.nonCoherentAtomSize
+
+	if !CreateDeviceObjects() {
+		assert(false, "ImGui_ImplVulkan_CreateDeviceObjects() failed!") // <- Can't be hit yet.
+	}
+
+	// Our render function expect RendererUserData to be storing the window render buffer we need (for the main viewport we won't use ->Window)
+	main_viewport := imgui.GetMainViewport()
+	main_viewport.RendererUserData = new_viewport_data()
+
+	InitMultiViewportSupport()
+
+	return true
+}
+
+Shutdown :: proc() {
+	bd := GetBackendData()
+	assert(bd != nil, "No renderer backend to shutdown, or already shutdown?")
+	io := imgui.GetIO()
+	platform_io := imgui.GetPlatformIO()
+
+	// First destroy objects in all viewports
+	DestroyDeviceObjects()
+
+	// Manually delete main viewport render data in-case we haven't initialized for viewports
+	main_viewport := imgui.GetMainViewport()
+	if vd := (^ViewportData)(main_viewport.RendererUserData); vd != nil {
+		free(vd, internal_allocator)
+	}
+	main_viewport.RendererUserData = nil
+
+	// Clean up windows
+	ShutdownMultiViewportSupport()
+
+	io.BackendRendererName = nil
+	io.BackendRendererUserData = nil
+	io.BackendFlags -= {.RendererHasVtxOffset, .RendererHasTextures, .RendererHasViewports}
+	imgui.PlatformIO_ClearPlatformHandlers(platform_io)
+	free(bd, internal_allocator)
+}
+
+NewFrame :: proc() {
+	bd := GetBackendData()
+	assert(bd != nil, "Context or backend not initialized! Did you call ImGui_ImplVulkan_Init()?")
+}
+
+RenderDrawData :: proc(
+	draw_data: ^imgui.DrawData,
+	command_buffer: vk.CommandBuffer,
+	pipeline: vk.Pipeline = 0,
+) {
+	pipeline := pipeline
+
+	// Avoid rendering when minimized, scale coordinates for retina displays (screen coordinates != framebuffer coordinates)
+	fb_width := i32(draw_data.DisplaySize.x * draw_data.FramebufferScale.x)
+	fb_height := i32(draw_data.DisplaySize.y * draw_data.FramebufferScale.y)
+	if fb_width <= 0 || fb_height <= 0 {
+		return
+	}
+
+	// Catch up with texture updates. Most of the times, the list will have 1 element with an OK status, aka nothing to do.
+	// (This almost always points to ImGui::GetPlatformIO().Textures[] but is part of ImDrawData to allow overriding or disabling texture updates).
+	if texs := draw_data.Textures; texs != nil {
+		for &tex in texs.Data[:texs.Size] {
+			if tex.Status != .OK {
+				UpdateTexture(tex)
+			}
+		}
+	}
+
+	bd := GetBackendData()
+	v := &bd.VulkanInitInfo
+	if pipeline == 0 {
+		pipeline = bd.Pipeline
+	}
+
+	// Allocate array to store enough vertex/index buffers. Each unique viewport gets its own storage.
+	viewport_renderer_data := (^ViewportData)(draw_data.OwnerViewport.RendererUserData)
+	assert(viewport_renderer_data != nil)
+	wrb := &viewport_renderer_data.RenderBuffers
+	if wrb.FrameRenderBuffers.Size == 0 {
+		wrb.Index = 0
+		wrb.Count = v.ImageCount
+		imgui.Vector_Resize(&wrb.FrameRenderBuffers, int(wrb.Count))
+		mem.zero(wrb.FrameRenderBuffers.Data, imgui.Vector_Size_In_Bytes(&wrb.FrameRenderBuffers))
+	}
+	assert(wrb.Count == v.ImageCount)
+	wrb.Index = (wrb.Index + 1) % wrb.Count
+	rb := &wrb.FrameRenderBuffers.Data[wrb.Index]
+
+	if draw_data.TotalVtxCount > 0 {
+		// Create or resize the vertex/index buffers
+		vertex_size := AlignBufferSize(
+			vk.DeviceSize(draw_data.TotalVtxCount * size_of(imgui.DrawVert)),
+			bd.BufferMemoryAlignment,
+		)
+		index_size := AlignBufferSize(
+			vk.DeviceSize(draw_data.TotalIdxCount * size_of(imgui.DrawIdx)),
+			bd.BufferMemoryAlignment,
+		)
+		if rb.VertexBuffer == 0 || rb.VertexBufferSize < vertex_size {
+			CreateOrResizeBuffer(
+				&rb.VertexBuffer,
+				&rb.VertexBufferMemory,
+				&rb.VertexBufferSize,
+				vertex_size,
+				{.VERTEX_BUFFER},
+			)
+		}
+		if rb.IndexBuffer == 0 || rb.IndexBufferSize < index_size {
+			CreateOrResizeBuffer(
+				&rb.IndexBuffer,
+				&rb.IndexBufferMemory,
+				&rb.IndexBufferSize,
+				index_size,
+				{.INDEX_BUFFER},
+			)
+		}
+
+		// Upload vertex/index data into a single contiguous GPU buffer
+		vtx_dst: rawptr
+		idx_dst: rawptr
+		err := vk.MapMemory(v.Device, rb.VertexBufferMemory, 0, vertex_size, nil, &vtx_dst)
+		check_vk_result(err)
+		err = vk.MapMemory(v.Device, rb.IndexBufferMemory, 0, index_size, nil, &idx_dst)
+		check_vk_result(err)
+		for &draw_list in draw_data.CmdLists.Data[:draw_data.CmdLists.Size] {
+			mem.copy(
+				vtx_dst,
+				draw_list.VtxBuffer.Data,
+				int(draw_list.VtxBuffer.Size * size_of(imgui.DrawVert)),
+			)
+			mem.copy(
+				idx_dst,
+				draw_list.IdxBuffer.Data,
+				int(draw_list.IdxBuffer.Size * size_of(imgui.DrawIdx)),
+			)
+			vtx_dst = rawptr(uintptr(vtx_dst) + uintptr(draw_list.VtxBuffer.Size))
+			idx_dst = rawptr(uintptr(idx_dst) + uintptr(draw_list.IdxBuffer.Size))
+		}
+		range := [?]vk.MappedMemoryRange {
+			{
+				sType = .MAPPED_MEMORY_RANGE,
+				memory = rb.VertexBufferMemory,
+				size = vk.DeviceSize(vk.WHOLE_SIZE),
+			},
+			{
+				sType = .MAPPED_MEMORY_RANGE,
+				memory = rb.IndexBufferMemory,
+				size = vk.DeviceSize(vk.WHOLE_SIZE),
+			},
+		}
+		err = vk.FlushMappedMemoryRanges(v.Device, len(range), &range[0])
+		check_vk_result(err)
+		vk.UnmapMemory(v.Device, rb.VertexBufferMemory)
+		vk.UnmapMemory(v.Device, rb.IndexBufferMemory)
+	}
+
+	// Setup desired Vulkan state
+	SetupRenderState(draw_data, pipeline, command_buffer, rb, fb_width, fb_height)
+
+	// Setup render state structure (for callbacks and custom texture bindings)
+	platform_io := imgui.GetPlatformIO()
+	render_state: RenderState = {
+		CommandBuffer  = command_buffer,
+		Pipeline       = pipeline,
+		PipelineLayout = bd.PipelineLayout,
+	}
+	platform_io.Renderer_RenderState = &render_state
+
+	// Will project scissor/clipping rectangles into framebuffer space
+	clip_off := draw_data.DisplayPos // (0,0) unless using multi-viewports
+	clip_scale := draw_data.FramebufferScale // (1,1) unless using retina display which are often (2,2)
+
+	// Render command lists
+	// (Because we merged all buffers into a single one, we maintain our own offset into them)
+	last_desc_set: vk.DescriptorSet = 0
+	global_vtx_offset: i32 = 0
+	global_idx_offset: i32 = 0
+	for draw_list in draw_data.CmdLists.Data[:draw_data.CmdLists.Size] {
+		for cmd_i: i32 = 0; cmd_i < draw_list.CmdBuffer.Size; cmd_i += 1 {
+			pcmd := &draw_list.CmdBuffer.Data[cmd_i]
+			if pcmd.UserCallback != nil {
+				// User callback, registered via ImDrawList::AddCallback()
+				// (ImDrawCallback_ResetRenderState is a special callback value used by the user to request the renderer to reset render state.)
+				if transmute(uintptr)(pcmd.UserCallback) == imgui.DrawCallback_ResetRenderState {
+					SetupRenderState(draw_data, pipeline, command_buffer, rb, fb_width, fb_height)
+				} else {
+					pcmd.UserCallback(draw_list, pcmd)
+				}
+				last_desc_set = 0
+			} else {
+				// Project scissor/clipping rectangles into framebuffer space
+				clip_min := imgui.Vec2 {
+					(pcmd.ClipRect.x - clip_off.x) * clip_scale.x,
+					(pcmd.ClipRect.y - clip_off.y) * clip_scale.y,
+				}
+				clip_max := imgui.Vec2 {
+					(pcmd.ClipRect.z - clip_off.x) * clip_scale.x,
+					(pcmd.ClipRect.w - clip_off.y) * clip_scale.y,
+				}
+
+				// Clamp to viewport as vkCmdSetScissor() won't accept values that are off bounds
+				if clip_min.x < 0 {clip_min.x = 0}
+				if clip_min.y < 0 {clip_min.y = 0}
+				if clip_max.x > f32(fb_width) {clip_max.x = f32(fb_width)}
+				if clip_max.y > f32(fb_height) {clip_max.y = f32(fb_height)}
+				if clip_max.x <= clip_min.x || clip_max.y <= clip_min.y {
+					continue
+				}
+
+				// Apply scissor/clipping rectangle
+				scissor: vk.Rect2D = {
+					offset = {x = i32(clip_min.x), y = i32(clip_min.y)},
+					extent = {
+						width = u32(clip_max.x - clip_min.x),
+						height = u32(clip_max.y - clip_min.y),
+					},
+				}
+				vk.CmdSetScissor(command_buffer, 0, 1, &scissor)
+
+				// Bind DescriptorSet with font or user texture
+				desc_set := transmute(vk.DescriptorSet)imgui.DrawCmd_GetTexID(pcmd)
+				if desc_set != last_desc_set {
+					vk.CmdBindDescriptorSets(
+						command_buffer,
+						.GRAPHICS,
+						bd.PipelineLayout,
+						0,
+						1,
+						&desc_set,
+						0,
+						nil,
+					)
+				}
+				last_desc_set = desc_set
+
+				// Draw
+				vk.CmdDrawIndexed(
+					command_buffer,
+					pcmd.ElemCount,
+					1,
+					pcmd.IdxOffset + u32(global_idx_offset),
+					i32(pcmd.VtxOffset) + global_vtx_offset,
+					0,
+				)
+			}
+		}
+		global_idx_offset += draw_list.IdxBuffer.Size
+		global_vtx_offset += draw_list.VtxBuffer.Size
+	}
+	platform_io.Renderer_RenderState = nil
+
+	// Note: at this point both vkCmdSetViewport() and vkCmdSetScissor() have been called.
+	// Our last values will leak into user/application rendering IF:
+	// - Your app uses a pipeline with VK_DYNAMIC_STATE_VIEWPORT or VK_DYNAMIC_STATE_SCISSOR dynamic state
+	// - And you forgot to call vkCmdSetViewport() and vkCmdSetScissor() yourself to explicitly set that state.
+	// If you use VK_DYNAMIC_STATE_VIEWPORT or VK_DYNAMIC_STATE_SCISSOR you are responsible for setting the values before rendering.
+	// In theory we should aim to backup/restore those values but I am not sure this is possible.
+	// We perform a call to vkCmdSetScissor() to set back a full viewport which is likely to fix things for 99% users but technically this is not perfect. (See github #4644)
+	scissor: vk.Rect2D = {{0, 0}, {u32(fb_width), u32(fb_height)}}
+	vk.CmdSetScissor(command_buffer, 0, 1, &scissor)
+}
+
+SetMinImageCount :: proc(min_image_count: u32) {
+	bd := GetBackendData()
+	assert(min_image_count >= 2)
+	if bd.VulkanInitInfo.MinImageCount == min_image_count {
+		return
+	}
+
+	assert(false) // FIXME-VIEWPORT: Unsupported. Need to recreate all swap chains!
+	v := &bd.VulkanInitInfo
+	err := vk.DeviceWaitIdle(v.Device)
+	check_vk_result(err)
+	DestroyAllViewportsRenderBuffers(v.Device, v.Allocator)
+
+	bd.VulkanInitInfo.MinImageCount = min_image_count
 }
 
 // Helpers

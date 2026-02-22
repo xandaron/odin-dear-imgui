@@ -2,8 +2,8 @@
 package ImGui_ImplVulkan
 
 import imgui ".."
-import "core:container/topological_sort"
 
+import "base:runtime"
 import "core:math"
 import "core:mem"
 import vk "vendor:vulkan"
@@ -45,6 +45,12 @@ ViewportData :: struct {
 	SwapChainSuboptimal:  bool, // Flag when VK_SUBOPTIMAL_KHR was returned.
 }
 
+new_viewport_data :: proc() -> ^ViewportData {
+	ptr := new(ViewportData, internal_allocator)
+	ptr.Window = Default_Window
+	return ptr
+}
+
 // Vulkan data
 Data :: struct {
 	VulkanInitInfo:                                    InitInfo,
@@ -70,6 +76,12 @@ Data :: struct {
 }
 
 Default_Data: Data : {BufferMemoryAlignment = 256, NonCoherentAtomSize = 64}
+
+new_data :: proc() -> ^Data {
+	ptr := new(Data, internal_allocator)
+	ptr^ = Default_Data
+	return ptr
+}
 
 //-----------------------------------------------------------------------------
 // SHADERS
@@ -648,7 +660,7 @@ MemoryType :: proc(properties: vk.MemoryPropertyFlags, type_bits: u32) -> u32 {
 	prop: vk.PhysicalDeviceMemoryProperties
 	vk.GetPhysicalDeviceMemoryProperties(v.PhysicalDevice, &prop)
 	for i: u32 = 0; i < prop.memoryTypeCount; i += 1 {
-		if properties < prop.memoryTypes[i].propertyFlags && type_bits & (1 << i) != 0 {
+		if properties <= prop.memoryTypes[i].propertyFlags && (type_bits & (1 << i) != 0) {
 			return i
 		}
 	}
@@ -790,233 +802,12 @@ SetupRenderState :: proc(
 	}
 }
 
-// Render function
-RenderDrawData :: proc(
-	draw_data: ^imgui.DrawData,
-	command_buffer: vk.CommandBuffer,
-	pipeline: vk.Pipeline,
-) {
-	pipeline := pipeline
-	err: vk.Result
-
-	// Avoid rendering when minimized, scale coordinates for retina displays (screen coordinates != framebuffer coordinates)
-	fb_width := i32(draw_data.DisplaySize.x * draw_data.FramebufferScale.x)
-	fb_height := i32(draw_data.DisplaySize.y * draw_data.FramebufferScale.y)
-	if fb_width <= 0 || fb_height <= 0 {
-		return
-	}
-
-	// Catch up with texture updates. Most of the times, the list will have 1 element with an OK status, aka nothing to do.
-	// (This almost always points to ImGui::GetPlatformIO().Textures[] but is part of ImDrawData to allow overriding or disabling texture updates).
-	if draw_data.Textures != nil {
-		for &tex in draw_data.Textures.Data[:draw_data.Textures.Size] {
-			if tex.Status != .OK {
-				UpdateTexture(tex)
-			}
-		}
-	}
-
-	bd := GetBackendData()
-	v := &bd.VulkanInitInfo
-	if pipeline == 0 {
-		pipeline = bd.Pipeline
-	}
-
-	// Allocate array to store enough vertex/index buffers. Each unique viewport gets its own storage.
-	viewport_renderer_data := transmute(^ViewportData)draw_data.OwnerViewport.RendererUserData
-	assert(viewport_renderer_data != nil)
-	wrb := &viewport_renderer_data.RenderBuffers
-	if wrb.FrameRenderBuffers.Size == 0 {
-		wrb.Index = 0
-		wrb.Count = v.ImageCount
-		imgui.Vector_Resize(&wrb.FrameRenderBuffers, int(wrb.Count))
-		imgui.Vector_Clear(&wrb.FrameRenderBuffers)
-	}
-	assert(wrb.Count == v.ImageCount)
-	wrb.Index = (wrb.Index + 1) % wrb.Count
-	rb := &wrb.FrameRenderBuffers.Data[wrb.Index]
-
-	if draw_data.TotalVtxCount > 0 {
-		// Create or resize the vertex/index buffers
-		vertex_size := AlignBufferSize(
-			vk.DeviceSize(draw_data.TotalVtxCount * size_of(imgui.DrawVert)),
-			bd.BufferMemoryAlignment,
-		)
-		index_size := AlignBufferSize(
-			vk.DeviceSize(draw_data.TotalIdxCount * size_of(imgui.DrawIdx)),
-			bd.BufferMemoryAlignment,
-		)
-		if rb.VertexBuffer == 0 || rb.VertexBufferSize < vertex_size {
-			CreateOrResizeBuffer(
-				&rb.VertexBuffer,
-				&rb.VertexBufferMemory,
-				&rb.VertexBufferSize,
-				vertex_size,
-				{.VERTEX_BUFFER},
-			)
-		}
-		if rb.IndexBuffer == 0 || rb.IndexBufferSize < index_size {
-			CreateOrResizeBuffer(
-				&rb.IndexBuffer,
-				&rb.IndexBufferMemory,
-				&rb.IndexBufferSize,
-				index_size,
-				{.INDEX_BUFFER},
-			)
-		}
-
-		// Upload vertex/index data into a single contiguous GPU buffer
-		vtx_dst: rawptr
-		idx_dst: rawptr
-		err = vk.MapMemory(v.Device, rb.VertexBufferMemory, 0, vertex_size, nil, &vtx_dst)
-		check_vk_result(err)
-		err = vk.MapMemory(v.Device, rb.IndexBufferMemory, 0, index_size, nil, &idx_dst)
-		check_vk_result(err)
-		for &draw_list in draw_data.CmdLists.Data[:draw_data.CmdLists.Size] {
-			mem.copy(
-				vtx_dst,
-				draw_list.VtxBuffer.Data,
-				int(draw_list.VtxBuffer.Size * size_of(imgui.DrawVert)),
-			)
-			mem.copy(
-				idx_dst,
-				draw_list.IdxBuffer.Data,
-				int(draw_list.IdxBuffer.Size * size_of(imgui.DrawIdx)),
-			)
-			vtx_dst = rawptr(uintptr(vtx_dst) + uintptr(draw_list.VtxBuffer.Size))
-			idx_dst = rawptr(uintptr(idx_dst) + uintptr(draw_list.IdxBuffer.Size))
-		}
-		range := [?]vk.MappedMemoryRange {
-			{
-				sType = .MAPPED_MEMORY_RANGE,
-				memory = rb.VertexBufferMemory,
-				size = vk.DeviceSize(vk.WHOLE_SIZE),
-			},
-			{
-				sType = .MAPPED_MEMORY_RANGE,
-				memory = rb.IndexBufferMemory,
-				size = vk.DeviceSize(vk.WHOLE_SIZE),
-			},
-		}
-		err = vk.FlushMappedMemoryRanges(v.Device, len(range), &range[0])
-		check_vk_result(err)
-		vk.UnmapMemory(v.Device, rb.VertexBufferMemory)
-		vk.UnmapMemory(v.Device, rb.IndexBufferMemory)
-	}
-
-	// Setup desired Vulkan state
-	SetupRenderState(draw_data, pipeline, command_buffer, rb, fb_width, fb_height)
-
-	// Setup render state structure (for callbacks and custom texture bindings)
-	platform_io := imgui.GetPlatformIO()
-	render_state: RenderState = {
-		CommandBuffer  = command_buffer,
-		Pipeline       = pipeline,
-		PipelineLayout = bd.PipelineLayout,
-	}
-	platform_io.Renderer_RenderState = &render_state
-
-	// Will project scissor/clipping rectangles into framebuffer space
-	clip_off := draw_data.DisplayPos // (0,0) unless using multi-viewports
-	clip_scale := draw_data.FramebufferScale // (1,1) unless using retina display which are often (2,2)
-
-	// Render command lists
-	// (Because we merged all buffers into a single one, we maintain our own offset into them)
-	last_desc_set: vk.DescriptorSet = 0
-	global_vtx_offset: i32 = 0
-	global_idx_offset: i32 = 0
-	for draw_list in draw_data.CmdLists.Data[:draw_data.CmdLists.Size] {
-		for cmd_i: i32 = 0; cmd_i < draw_list.CmdBuffer.Size; cmd_i += 1 {
-			pcmd := &draw_list.CmdBuffer.Data[cmd_i]
-			if pcmd.UserCallback != nil {
-				// User callback, registered via ImDrawList::AddCallback()
-				// (ImDrawCallback_ResetRenderState is a special callback value used by the user to request the renderer to reset render state.)
-				if transmute(uintptr)(pcmd.UserCallback) == imgui.DrawCallback_ResetRenderState {
-					SetupRenderState(draw_data, pipeline, command_buffer, rb, fb_width, fb_height)
-				} else {
-					pcmd.UserCallback(draw_list, pcmd)
-				}
-				last_desc_set = 0
-			} else {
-				// Project scissor/clipping rectangles into framebuffer space
-				clip_min := imgui.Vec2 {
-					(pcmd.ClipRect.x - clip_off.x) * clip_scale.x,
-					(pcmd.ClipRect.y - clip_off.y) * clip_scale.y,
-				}
-				clip_max := imgui.Vec2 {
-					(pcmd.ClipRect.z - clip_off.x) * clip_scale.x,
-					(pcmd.ClipRect.w - clip_off.y) * clip_scale.y,
-				}
-
-				// Clamp to viewport as vkCmdSetScissor() won't accept values that are off bounds
-				if clip_min.x < 0 {clip_min.x = 0}
-				if clip_min.y < 0 {clip_min.y = 0}
-				if clip_max.x > f32(fb_width) {clip_max.x = f32(fb_width)}
-				if clip_max.y > f32(fb_height) {clip_max.y = f32(fb_height)}
-				if clip_max.x <= clip_min.x || clip_max.y <= clip_min.y {
-					continue
-				}
-
-				// Apply scissor/clipping rectangle
-				scissor: vk.Rect2D = {
-					offset = {x = i32(clip_min.x), y = i32(clip_min.y)},
-					extent = {
-						width = u32(clip_max.x - clip_min.x),
-						height = u32(clip_max.y - clip_min.y),
-					},
-				}
-				vk.CmdSetScissor(command_buffer, 0, 1, &scissor)
-
-				// Bind DescriptorSet with font or user texture
-				desc_set := transmute(vk.DescriptorSet)imgui.DrawCmd_GetTexID(pcmd)
-				if desc_set != last_desc_set {
-					vk.CmdBindDescriptorSets(
-						command_buffer,
-						.GRAPHICS,
-						bd.PipelineLayout,
-						0,
-						1,
-						&desc_set,
-						0,
-						nil,
-					)
-				}
-				last_desc_set = desc_set
-
-				// Draw
-				vk.CmdDrawIndexed(
-					command_buffer,
-					pcmd.ElemCount,
-					1,
-					pcmd.IdxOffset + u32(global_idx_offset),
-					i32(pcmd.VtxOffset) + global_vtx_offset,
-					0,
-				)
-			}
-		}
-		global_idx_offset += draw_list.IdxBuffer.Size
-		global_vtx_offset += draw_list.VtxBuffer.Size
-	}
-	platform_io.Renderer_RenderState = nil
-
-	// Note: at this point both vkCmdSetViewport() and vkCmdSetScissor() have been called.
-	// Our last values will leak into user/application rendering IF:
-	// - Your app uses a pipeline with VK_DYNAMIC_STATE_VIEWPORT or VK_DYNAMIC_STATE_SCISSOR dynamic state
-	// - And you forgot to call vkCmdSetViewport() and vkCmdSetScissor() yourself to explicitly set that state.
-	// If you use VK_DYNAMIC_STATE_VIEWPORT or VK_DYNAMIC_STATE_SCISSOR you are responsible for setting the values before rendering.
-	// In theory we should aim to backup/restore those values but I am not sure this is possible.
-	// We perform a call to vkCmdSetScissor() to set back a full viewport which is likely to fix things for 99% users but technically this is not perfect. (See github #4644)
-	scissor: vk.Rect2D = {{0, 0}, {u32(fb_width), u32(fb_height)}}
-	vk.CmdSetScissor(command_buffer, 0, 1, &scissor)
-}
-
 DestroyTexture :: proc(tex: ^imgui.TextureData) {
-	if backend_tex := transmute(^Texture)tex.BackendUserData; backend_tex != nil {
-		assert(backend_tex.DescriptorSet == transmute(vk.DescriptorSet)tex.TexID)
+	if backend_tex := (^Texture)(tex.BackendUserData); backend_tex != nil {
+		assert(backend_tex.DescriptorSet == (vk.DescriptorSet)(tex.TexID))
 		bd := GetBackendData()
 		v := &bd.VulkanInitInfo
-		// MARKER
-		// RemoveTexture(backend_tex.DescriptorSet)
+		RemoveTexture(backend_tex.DescriptorSet)
 		vk.DestroyImageView(v.Device, backend_tex.ImageView, v.Allocator)
 		vk.DestroyImage(v.Device, backend_tex.Image, v.Allocator)
 		vk.FreeMemory(v.Device, backend_tex.Memory, v.Allocator)
@@ -1065,7 +856,7 @@ UpdateTexture :: proc(tex: ^imgui.TextureData) {
 			vk.GetImageMemoryRequirements(v.Device, backend_tex.Image, &req)
 			alloc_info: vk.MemoryAllocateInfo = {
 				sType           = .MEMORY_ALLOCATE_INFO,
-				allocationSize  = math.max(v.MinAllocationSize, req.size),
+				allocationSize  = max(v.MinAllocationSize, req.size),
 				memoryTypeIndex = MemoryType({.DEVICE_LOCAL}, req.memoryTypeBits),
 			}
 			err = vk.AllocateMemory(v.Device, &alloc_info, v.Allocator, &backend_tex.Memory)
@@ -1088,12 +879,11 @@ UpdateTexture :: proc(tex: ^imgui.TextureData) {
 		}
 
 		// Create the Descriptor Set
-		// MARKER
-		// backend_tex.DescriptorSet = AddTexture(
-		// 	bd.TexSamplerLinear,
-		// 	backend_tex.ImageView,
-		// 	.SHADER_READ_ONLY_OPTIMAL,
-		// )
+		backend_tex.DescriptorSet = AddTexture(
+			bd.TexSamplerLinear,
+			backend_tex.ImageView,
+			.SHADER_READ_ONLY_OPTIMAL,
+		)
 
 		// Store identifiers
 		imgui.TextureData_SetTexID(tex, transmute(imgui.TextureID)backend_tex.DescriptorSet)
@@ -1535,8 +1325,7 @@ CreateDeviceObjects :: proc() -> bool {
 		v.UseDynamicRendering &&
 		v.PipelineInfoMain.PipelineRenderingCreateInfo.sType == .PIPELINE_RENDERING_CREATE_INFO
 	if create_main_pipeline {
-		// MARKER
-		// CreateMainPipeline(&v.PipelineInfoMain)
+		CreateMainPipeline(&v.PipelineInfoMain)
 	}
 
 	// Create command pool/buffer for texture upload
@@ -1594,12 +1383,11 @@ CreateMainPipeline :: proc(pipeline_info_in: ^PipelineInfo) {
 DestroyDeviceObjects :: proc() {
 	bd := GetBackendData()
 	v := &bd.VulkanInitInfo
-	// MARKER
-	// DestroyAllViewportsRenderBuffers(v.Device, v.Allocator)
+	DestroyAllViewportsRenderBuffers(v.Device, v.Allocator)
 
 	// Destroy all textures
-	textures := &imgui.GetPlatformIO().Textures
-	for &tex in textures.Data[:textures.Size] {
+	texs := &imgui.GetPlatformIO().Textures
+	for &tex in texs.Data[:texs.Size] {
 		if tex.RefCount == 1 {
 			DestroyTexture(tex)
 		}
@@ -1651,112 +1439,6 @@ DestroyDeviceObjects :: proc() {
 // We don't care about other versions than 1.3 for our checks, so don't need to make this exhaustive (e.g. with all #ifdef VK_VERSION_1_X checks)
 GetDefaultApiVersion :: proc() -> u32 {
 	return vk.API_VERSION_1_4
-}
-
-Init :: proc(info: ^InitInfo, allocator := context.allocator) -> bool {
-	imgui.CHECKVERSION()
-	io := imgui.GetIO()
-	assert(io.BackendRendererUserData == nil, "Already initialized a renderer backend!")
-
-	internal_allocator = allocator
-	if info.ApiVersion == 0 {
-		info.ApiVersion = GetDefaultApiVersion()
-	}
-
-	// Setup backend capabilities flags
-	bd := new(Data, internal_allocator)
-	io.BackendRendererUserData = bd
-	io.BackendRendererName = "imgui_impl_vulkan"
-	// We can honor the ImDrawCmd::VtxOffset field, allowing for large meshes.
-	// We can honor ImGuiPlatformIO::Textures[] requests during render.
-	// We can create multi-viewports on the Renderer side (optional)
-	io.BackendFlags += {.RendererHasVtxOffset, .RendererHasTextures, .RendererHasViewports}
-
-	// Sanity checks
-	assert(info.Instance != nil)
-	assert(info.PhysicalDevice != nil)
-	assert(info.Device != nil)
-	assert(info.Queue != nil)
-	assert(info.MinImageCount >= 2)
-	assert(info.ImageCount >= info.MinImageCount)
-	if info.DescriptorPool != 0 { 	// Either DescriptorPool or DescriptorPoolSize must be set, not both!
-		assert(info.DescriptorPoolSize == 0)
-	} else {
-		assert(info.DescriptorPoolSize > 0)
-	}
-
-	if info.UseDynamicRendering {
-		assert(
-			info.PipelineInfoMain.RenderPass == 0 && info.PipelineInfoForViewports.RenderPass == 0,
-		)
-	}
-	bd.VulkanInitInfo = info^
-
-	properties: vk.PhysicalDeviceProperties
-	vk.GetPhysicalDeviceProperties(info.PhysicalDevice, &properties)
-	bd.NonCoherentAtomSize = properties.limits.nonCoherentAtomSize
-
-	if !CreateDeviceObjects() {
-		assert(false, "ImGui_ImplVulkan_CreateDeviceObjects() failed!") // <- Can't be hit yet.
-	}
-
-	// Our render function expect RendererUserData to be storing the window render buffer we need (for the main viewport we won't use ->Window)
-	main_viewport := imgui.GetMainViewport()
-	main_viewport.RendererUserData = new(ViewportData, internal_allocator)
-
-	// MARKER
-	// InitMultiViewportSupport()
-
-	return true
-}
-
-Shutdown :: proc() {
-	bd := GetBackendData()
-	assert(bd != nil, "No renderer backend to shutdown, or already shutdown?")
-	io := imgui.GetIO()
-	platform_io := imgui.GetPlatformIO()
-
-	// First destroy objects in all viewports
-	DestroyDeviceObjects()
-
-	// Manually delete main viewport render data in-case we haven't initialized for viewports
-	main_viewport := imgui.GetMainViewport()
-	if vd := transmute(^ViewportData)main_viewport.RendererUserData; vd != nil {
-		free(vd, internal_allocator)
-	}
-	main_viewport.RendererUserData = nil
-
-	// Clean up windows
-	// MARKER
-	// ShutdownMultiViewportSupport()
-
-	io.BackendRendererName = nil
-	io.BackendRendererUserData = nil
-	io.BackendFlags -= {.RendererHasVtxOffset, .RendererHasTextures, .RendererHasViewports}
-	imgui.PlatformIO_ClearPlatformHandlers(platform_io)
-	free(bd, internal_allocator)
-}
-
-NewFrame :: proc() {
-	bd := GetBackendData()
-	assert(bd != nil, "Context or backend not initialized! Did you call ImGui_ImplVulkan_Init()?")
-}
-
-SetMinImageCount :: proc(min_image_count: u32) {
-	bd := GetBackendData()
-	assert(min_image_count >= 2)
-	if bd.VulkanInitInfo.MinImageCount == min_image_count {
-		return
-	}
-
-	assert(false) // FIXME-VIEWPORT: Unsupported. Need to recreate all swap chains!
-	v := &bd.VulkanInitInfo
-	err := vk.DeviceWaitIdle(v.Device)
-	check_vk_result(err)
-	// MARKER
-	// DestroyAllViewportsRenderBuffers(v.Device, v.Allocator)
-
-	bd.VulkanInitInfo.MinImageCount = min_image_count
 }
 
 // Register a texture by creating a descriptor
@@ -1842,10 +1524,10 @@ DestroyWindowRenderBuffers :: proc(
 ) {
 	for n: u32 = 0; n < buffers.Count; n += 1 {
 		DestroyFrameRenderBuffers(device, &buffers.FrameRenderBuffers.Data[n], allocator)
-		imgui.Vector_Clear(&buffers.FrameRenderBuffers)
-		buffers.Index = 0
-		buffers.Count = 0
 	}
+	imgui.Vector_Clear(&buffers.FrameRenderBuffers)
+	buffers.Index = 0
+	buffers.Count = 0
 }
 
 //-------------------------------------------------------------------------
@@ -1939,12 +1621,10 @@ CreateWindowSwapChain :: proc(
 	// We don't use ImGui_ImplVulkanH_DestroyWindow() because we want to preserve the old swapchain to create the new one.
 	// Destroy old Framebuffer
 	for i: u32 = 0; i < wd.ImageCount; i += 1 {
-		// MARKER
-		// DestroyFrame(device, &wd.Frames.Data[i], allocator)
+		DestroyFrame(device, &wd.Frames.Data[i], allocator)
 	}
 	for i: u32 = 0; i < wd.SemaphoreCount; i += 1 {
-		// MARKER
-		// DestroyFrameSemaphores(device, &wd.FrameSemaphores.Data[i], allocator)
+		DestroyFrameSemaphores(device, &wd.FrameSemaphores.Data[i], allocator)
 	}
 	imgui.Vector_Clear(&wd.Frames)
 	imgui.Vector_Clear(&wd.FrameSemaphores)
@@ -2148,9 +1828,10 @@ DestroyAllViewportsRenderBuffers :: proc(device: vk.Device, allocator: ^vk.Alloc
 // // If you are new to dear imgui or creating a new binding for dear imgui, it is recommended that you completely ignore this section first..
 // //--------------------------------------------------------------------------------------------------------
 
-CreateWindow :: proc(viewport: ^imgui.Viewport) {
+CreateWindow :: proc "c" (viewport: ^imgui.Viewport) {
+	context = runtime.default_context()
 	bd := GetBackendData()
-	vd := new(ViewportData, internal_allocator)
+	vd := new_viewport_data()
 	wd := &vd.Window
 	v := &bd.VulkanInitInfo
 
@@ -2252,239 +1933,282 @@ CreateWindow :: proc(viewport: ^imgui.Viewport) {
 	}
 }
 
-// static void ImGui_ImplVulkan_DestroyWindow(ImGuiViewport* viewport)
-// {
-//     // The main viewport (owned by the application) will always have RendererUserData == 0 since we didn't create the data for it.
-//     ImGui_ImplVulkan_Data* bd = ImGui_ImplVulkan_GetBackendData();
-//     if (ImGui_ImplVulkan_ViewportData* vd = (ImGui_ImplVulkan_ViewportData*)viewport->RendererUserData)
-//     {
-//         ImGui_ImplVulkan_InitInfo* v = &bd->VulkanInitInfo;
-//         if (vd->WindowOwned)
-//         {
-//             ImGui_ImplVulkanH_DestroyWindow(v->Instance, v->Device, &vd->Window, v->Allocator);
-//             vkDestroySurfaceKHR(v->Instance, vd->Window.Surface, v->Allocator);
-//         }
-//         ImGui_ImplVulkan_DestroyWindowRenderBuffers(v->Device, &vd->RenderBuffers, v->Allocator);
-//         IM_DELETE(vd);
-//     }
-//     viewport->RendererUserData = nullptr;
-// }
+DestroyWindow_Internal :: proc "c" (viewport: ^imgui.Viewport) {
+	context = runtime.default_context()
+	// The main viewport (owned by the application) will always have RendererUserData == 0 since we didn't create the data for it.
+	bd := GetBackendData()
+	if vd := (^ViewportData)(viewport.RendererUserData); vd != nil {
+		v := &bd.VulkanInitInfo
+		if vd.WindowOwned {
+			DestroyWindow(v.Instance, v.Device, &vd.Window, v.Allocator)
+			vk.DestroySurfaceKHR(v.Instance, vd.Window.Surface, v.Allocator)
+		}
+		DestroyWindowRenderBuffers(v.Device, &vd.RenderBuffers, v.Allocator)
+		free(vd, internal_allocator)
+	}
+	viewport.RendererUserData = nil
+}
 
-// static void ImGui_ImplVulkan_SetWindowSize(ImGuiViewport* viewport, ImVec2 size)
-// {
-//     ImGui_ImplVulkan_Data* bd = ImGui_ImplVulkan_GetBackendData();
-//     ImGui_ImplVulkan_ViewportData* vd = (ImGui_ImplVulkan_ViewportData*)viewport->RendererUserData;
-//     if (vd == nullptr) // This is nullptr for the main viewport (which is left to the user/app to handle)
-//         return;
-//     ImGui_ImplVulkan_InitInfo* v = &bd->VulkanInitInfo;
-//     ImGui_ImplVulkanH_Window* wd = &vd->Window;
-//     wd->AttachmentDesc.loadOp = (viewport->Flags & ImGuiViewportFlags_NoRendererClear) ? VK_ATTACHMENT_LOAD_OP_DONT_CARE : VK_ATTACHMENT_LOAD_OP_CLEAR;
-//     ImGui_ImplVulkanH_CreateOrResizeWindow(v->Instance, v->PhysicalDevice, v->Device, &vd->Window, v->QueueFamily, v->Allocator, (int)size.x, (int)size.y, v->MinImageCount, v->PipelineInfoForViewports.SwapChainImageUsage);
-// }
+SetWindowSize :: proc "c" (viewport: ^imgui.Viewport, size: imgui.Vec2) {
+	context = runtime.default_context()
+	bd := GetBackendData()
+	vd := (^ViewportData)(viewport.RendererUserData)
+	if vd == nil { 	// This is nullptr for the main viewport (which is left to the user/app to handle)
+		return
+	}
+	v := &bd.VulkanInitInfo
+	wd := &vd.Window
+	wd.AttachmentDesc.loadOp = .NoRendererClear in viewport.Flags ? .DONT_CARE : .CLEAR
+	CreateOrResizeWindow(
+		v.Instance,
+		v.PhysicalDevice,
+		v.Device,
+		&vd.Window,
+		v.QueueFamily,
+		v.Allocator,
+		i32(size.x),
+		i32(size.y),
+		v.MinImageCount,
+		v.PipelineInfoForViewports.SwapChainImageUsage,
+	)
+}
 
-// static void ImGui_ImplVulkan_RenderWindow(ImGuiViewport* viewport, void*)
-// {
-//     ImGui_ImplVulkan_Data* bd = ImGui_ImplVulkan_GetBackendData();
-//     ImGui_ImplVulkan_ViewportData* vd = (ImGui_ImplVulkan_ViewportData*)viewport->RendererUserData;
-//     if (vd == nullptr)
-//         return;
-//     ImGui_ImplVulkanH_Window* wd = &vd->Window;
-//     ImGui_ImplVulkan_InitInfo* v = &bd->VulkanInitInfo;
-//     VkResult err;
+RenderWindow :: proc "c" (viewport: ^imgui.Viewport, _: rawptr) {
+	context = runtime.default_context()
+	bd := GetBackendData()
+	vd := (^ViewportData)(viewport.RendererUserData)
+	if vd == nil {
+		return
+	}
+	wd := &vd.Window
+	v := &bd.VulkanInitInfo
+	err: vk.Result
 
-//     if (vd->SwapChainNeedRebuild || vd->SwapChainSuboptimal)
-//     {
-//         ImGui_ImplVulkanH_CreateOrResizeWindow(v->Instance, v->PhysicalDevice, v->Device, wd, v->QueueFamily, v->Allocator, (int)viewport->Size.x, (int)viewport->Size.y, v->MinImageCount, v->PipelineInfoForViewports.SwapChainImageUsage);
-//         vd->SwapChainNeedRebuild = vd->SwapChainSuboptimal = false;
-//     }
+	if vd.SwapChainNeedRebuild || vd.SwapChainSuboptimal {
+		CreateOrResizeWindow(
+			v.Instance,
+			v.PhysicalDevice,
+			v.Device,
+			wd,
+			v.QueueFamily,
+			v.Allocator,
+			i32(viewport.Size.x),
+			i32(viewport.Size.y),
+			v.MinImageCount,
+			v.PipelineInfoForViewports.SwapChainImageUsage,
+		)
+		vd.SwapChainNeedRebuild = false
+		vd.SwapChainSuboptimal = false
+	}
 
-//     ImGui_ImplVulkanH_Frame* fd = nullptr;
-//     ImGui_ImplVulkanH_FrameSemaphores* fsd = &wd->FrameSemaphores[wd->SemaphoreIndex];
-//     {
-//         {
-//             err = vkAcquireNextImageKHR(v->Device, wd->Swapchain, UINT64_MAX, fsd->ImageAcquiredSemaphore, VK_NULL_HANDLE, &wd->FrameIndex);
-//             if (err == VK_ERROR_OUT_OF_DATE_KHR)
-//             {
-//                 vd->SwapChainNeedRebuild = true; // Since we are not going to swap this frame anyway, it's ok that recreation happens on next frame.
-//                 return;
-//             }
-//             if (err == VK_SUBOPTIMAL_KHR)
-//                 vd->SwapChainSuboptimal = true;
-//             else
-//                 check_vk_result(err);
-//             fd = &wd->Frames[wd->FrameIndex];
-//         }
-//         for (;;)
-//         {
-//             err = vkWaitForFences(v->Device, 1, &fd->Fence, VK_TRUE, 100);
-//             if (err == VK_SUCCESS) break;
-//             if (err == VK_TIMEOUT) continue;
-//             check_vk_result(err);
-//         }
-//         {
-//             err = vkResetCommandPool(v->Device, fd->CommandPool, 0);
-//             check_vk_result(err);
-//             VkCommandBufferBeginInfo info = {};
-//             info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-//             info.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-//             err = vkBeginCommandBuffer(fd->CommandBuffer, &info);
-//             check_vk_result(err);
-//         }
-//         {
-//             ImVec4 clear_color = ImVec4(0.0f, 0.0f, 0.0f, 1.0f);
-//             memcpy(&wd->ClearValue.color.float32[0], &clear_color, 4 * sizeof(float));
-//         }
-// #ifdef IMGUI_IMPL_VULKAN_HAS_DYNAMIC_RENDERING
-//         if (v->UseDynamicRendering)
-//         {
-//             // Transition swapchain image to a layout suitable for drawing.
-//             VkImageMemoryBarrier barrier = {};
-//             barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-//             barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-//             barrier.oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-//             barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-//             barrier.image = fd->Backbuffer;
-//             barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-//             barrier.subresourceRange.levelCount = 1;
-//             barrier.subresourceRange.layerCount = 1;
-//             vkCmdPipelineBarrier(fd->CommandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_NONE, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+	fd: ^Frame
+	fsd := &wd.FrameSemaphores.Data[wd.SemaphoreIndex]
+	{
+		{
+			err = vk.AcquireNextImageKHR(
+				v.Device,
+				wd.Swapchain,
+				max(u64),
+				fsd.ImageAcquiredSemaphore,
+				0,
+				&wd.FrameIndex,
+			)
+			#partial switch err {
+			case .ERROR_OUT_OF_DATE_KHR:
+				vd.SwapChainNeedRebuild = true // Since we are not going to swap this frame anyway, it's ok that recreation happens on next frame.
+				return
+			case .SUBOPTIMAL_KHR:
+				vd.SwapChainSuboptimal = true
+			case:
+				check_vk_result(err)
+			}
+			fd = &wd.Frames.Data[wd.FrameIndex]
+		}
+		for {
+			err = vk.WaitForFences(v.Device, 1, &fd.Fence, true, 100)
+			if err == .SUCCESS {break}
+			if err == .TIMEOUT {continue}
+			check_vk_result(err)
+		}
+		{
+			err = vk.ResetCommandPool(v.Device, fd.CommandPool, nil)
+			check_vk_result(err)
+			info: vk.CommandBufferBeginInfo = {
+				sType = .COMMAND_BUFFER_BEGIN_INFO,
+				flags = {.ONE_TIME_SUBMIT},
+			}
+			err = vk.BeginCommandBuffer(fd.CommandBuffer, &info)
+			check_vk_result(err)
+		}
+		{
+			// clear_color := imgui.Vec4{0, 0, 0, 1}
+			// mem.copy(&wd.ClearValue.color.float32[0], &clear_color, 4 * size_of(f32))
+			wd.ClearValue.color.float32 = {0, 0, 0, 1}
+		}
+		if v.UseDynamicRendering {
+			// Transition swapchain image to a layout suitable for drawing.
+			barrier: vk.ImageMemoryBarrier = {
+				sType = .IMAGE_MEMORY_BARRIER,
+				dstAccessMask = {.COLOR_ATTACHMENT_WRITE},
+				oldLayout = .PRESENT_SRC_KHR,
+				newLayout = .COLOR_ATTACHMENT_OPTIMAL,
+				image = fd.Backbuffer,
+				subresourceRange = {aspectMask = {.COLOR}, levelCount = 1, layerCount = 1},
+			}
+			vk.CmdPipelineBarrier(
+				fd.CommandBuffer,
+				{.COLOR_ATTACHMENT_OUTPUT},
+				{.COLOR_ATTACHMENT_OUTPUT},
+				nil,
+				0,
+				nil,
+				0,
+				nil,
+				1,
+				&barrier,
+			)
 
-//             VkRenderingAttachmentInfo attachmentInfo = {};
-//             attachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
-//             attachmentInfo.imageView = fd->BackbufferView;
-//             attachmentInfo.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-//             attachmentInfo.resolveMode = VK_RESOLVE_MODE_NONE;
-//             attachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-//             attachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-//             attachmentInfo.clearValue = wd->ClearValue;
+			attachmentInfo: vk.RenderingAttachmentInfo = {
+				sType       = .RENDERING_ATTACHMENT_INFO,
+				imageView   = fd.BackbufferView,
+				imageLayout = .COLOR_ATTACHMENT_OPTIMAL,
+				resolveMode = nil,
+				loadOp      = .CLEAR,
+				storeOp     = .STORE,
+				clearValue  = wd.ClearValue,
+			}
 
-//             VkRenderingInfo renderingInfo = {};
-//             renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR;
-//             renderingInfo.renderArea.extent.width = wd->Width;
-//             renderingInfo.renderArea.extent.height = wd->Height;
-//             renderingInfo.layerCount = 1;
-//             renderingInfo.viewMask = 0;
-//             renderingInfo.colorAttachmentCount = 1;
-//             renderingInfo.pColorAttachments = &attachmentInfo;
+			renderingInfo: vk.RenderingInfo = {
+				sType = .RENDERING_INFO_KHR,
+				renderArea = {extent = {width = u32(wd.Width), height = u32(wd.Height)}},
+				layerCount = 1,
+				viewMask = 0,
+				colorAttachmentCount = 1,
+				pColorAttachments = &attachmentInfo,
+			}
 
-//             ImGuiImplVulkanFuncs_vkCmdBeginRenderingKHR(fd->CommandBuffer, &renderingInfo);
-//         }
-//         else
-// #endif
-//         {
-//             VkRenderPassBeginInfo info = {};
-//             info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-//             info.renderPass = wd->RenderPass;
-//             info.framebuffer = fd->Framebuffer;
-//             info.renderArea.extent.width = wd->Width;
-//             info.renderArea.extent.height = wd->Height;
-//             info.clearValueCount = (viewport->Flags & ImGuiViewportFlags_NoRendererClear) ? 0 : 1;
-//             info.pClearValues = (viewport->Flags & ImGuiViewportFlags_NoRendererClear) ? nullptr : &wd->ClearValue;
-//             vkCmdBeginRenderPass(fd->CommandBuffer, &info, VK_SUBPASS_CONTENTS_INLINE);
-//         }
-//     }
+			vk.CmdBeginRendering(fd.CommandBuffer, &renderingInfo)
+		} else {
+			info: vk.RenderPassBeginInfo = {
+				sType = .RENDER_PASS_BEGIN_INFO,
+				renderPass = wd.RenderPass,
+				framebuffer = fd.Framebuffer,
+				renderArea = {extent = {width = u32(wd.Width), height = u32(wd.Height)}},
+				clearValueCount = .NoRendererClear in viewport.Flags ? 0 : 1,
+				pClearValues = .NoRendererClear in viewport.Flags ? nil : &wd.ClearValue,
+			}
+			vk.CmdBeginRenderPass(fd.CommandBuffer, &info, .INLINE)
+		}
+	}
 
-//     ImGui_ImplVulkan_RenderDrawData(viewport->DrawData, fd->CommandBuffer, bd->PipelineForViewports);
+	RenderDrawData(viewport.DrawData_, fd.CommandBuffer, bd.PipelineForViewports)
 
-//     {
-// #ifdef IMGUI_IMPL_VULKAN_HAS_DYNAMIC_RENDERING
-//         if (v->UseDynamicRendering)
-//         {
-//             ImGuiImplVulkanFuncs_vkCmdEndRenderingKHR(fd->CommandBuffer);
+	{
+		if v.UseDynamicRendering {
+			vk.CmdEndRenderingKHR(fd.CommandBuffer)
 
-//             // Transition image to a layout suitable for presentation
-//             VkImageMemoryBarrier barrier = {};
-//             barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-//             barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-//             barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-//             barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-//             barrier.image = fd->Backbuffer;
-//             barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-//             barrier.subresourceRange.levelCount = 1;
-//             barrier.subresourceRange.layerCount = 1;
-//             vkCmdPipelineBarrier(fd->CommandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
-//         }
-//         else
-// #endif
-//         {
-//             vkCmdEndRenderPass(fd->CommandBuffer);
-//         }
-//         {
-//             VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-//             VkSubmitInfo info = {};
-//             info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-//             info.waitSemaphoreCount = 1;
-//             info.pWaitSemaphores = &fsd->ImageAcquiredSemaphore;
-//             info.pWaitDstStageMask = &wait_stage;
-//             info.commandBufferCount = 1;
-//             info.pCommandBuffers = &fd->CommandBuffer;
-//             info.signalSemaphoreCount = 1;
-//             info.pSignalSemaphores = &fsd->RenderCompleteSemaphore;
+			// Transition image to a layout suitable for presentation
+			barrier: vk.ImageMemoryBarrier = {
+				sType = .IMAGE_MEMORY_BARRIER,
+				srcAccessMask = {.COLOR_ATTACHMENT_WRITE},
+				oldLayout = .COLOR_ATTACHMENT_OPTIMAL,
+				newLayout = .PRESENT_SRC_KHR,
+				image = fd.Backbuffer,
+				subresourceRange = {aspectMask = {.COLOR}, levelCount = 1, layerCount = 1},
+			}
+			vk.CmdPipelineBarrier(
+				fd.CommandBuffer,
+				{.COLOR_ATTACHMENT_OUTPUT},
+				{.BOTTOM_OF_PIPE},
+				nil,
+				0,
+				nil,
+				0,
+				nil,
+				1,
+				&barrier,
+			)
+		} else {
+			vk.CmdEndRenderPass(fd.CommandBuffer)
+		}
+		{
+			wait_stage: vk.PipelineStageFlags = {.COLOR_ATTACHMENT_OUTPUT}
+			info: vk.SubmitInfo = {
+				sType                = .SUBMIT_INFO,
+				waitSemaphoreCount   = 1,
+				pWaitSemaphores      = &fsd.ImageAcquiredSemaphore,
+				pWaitDstStageMask    = &wait_stage,
+				commandBufferCount   = 1,
+				pCommandBuffers      = &fd.CommandBuffer,
+				signalSemaphoreCount = 1,
+				pSignalSemaphores    = &fsd.RenderCompleteSemaphore,
+			}
 
-//             err = vkEndCommandBuffer(fd->CommandBuffer);
-//             check_vk_result(err);
-//             err = vkResetFences(v->Device, 1, &fd->Fence);
-//             check_vk_result(err);
-//             err = vkQueueSubmit(v->Queue, 1, &info, fd->Fence);
-//             check_vk_result(err);
-//         }
-//     }
-// }
+			err = vk.EndCommandBuffer(fd.CommandBuffer)
+			check_vk_result(err)
+			err = vk.ResetFences(v.Device, 1, &fd.Fence)
+			check_vk_result(err)
+			err = vk.QueueSubmit(v.Queue, 1, &info, fd.Fence)
+			check_vk_result(err)
+		}
+	}
+}
 
-// static void ImGui_ImplVulkan_SwapBuffers(ImGuiViewport* viewport, void*)
-// {
-//     ImGui_ImplVulkan_Data* bd = ImGui_ImplVulkan_GetBackendData();
-//     ImGui_ImplVulkan_ViewportData* vd = (ImGui_ImplVulkan_ViewportData*)viewport->RendererUserData;
-//     if (vd == nullptr)
-//         return;
-//     ImGui_ImplVulkanH_Window* wd = &vd->Window;
-//     ImGui_ImplVulkan_InitInfo* v = &bd->VulkanInitInfo;
+SwapBuffers :: proc "c" (viewport: ^imgui.Viewport, _: rawptr) {
+	context = runtime.default_context()
+	bd := GetBackendData()
+	vd := (^ViewportData)(viewport.RendererUserData)
+	if vd == nil {
+		return
+	}
+	wd := &vd.Window
+	v := &bd.VulkanInitInfo
 
-//     if (vd->SwapChainNeedRebuild) // Frame data became invalid in the middle of rendering
-//         return;
+	if vd.SwapChainNeedRebuild { 	// Frame data became invalid in the middle of rendering
+		return
+	}
 
-//     VkResult err;
-//     uint32_t present_index = wd->FrameIndex;
+	err: vk.Result
+	present_index := wd.FrameIndex
 
-//     ImGui_ImplVulkanH_FrameSemaphores* fsd = &wd->FrameSemaphores[wd->SemaphoreIndex];
-//     VkPresentInfoKHR info = {};
-//     info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-//     info.waitSemaphoreCount = 1;
-//     info.pWaitSemaphores = &fsd->RenderCompleteSemaphore;
-//     info.swapchainCount = 1;
-//     info.pSwapchains = &wd->Swapchain;
-//     info.pImageIndices = &present_index;
-//     err = vkQueuePresentKHR(v->Queue, &info);
-//     if (err == VK_ERROR_OUT_OF_DATE_KHR)
-//     {
-//         vd->SwapChainNeedRebuild = true;
-//         return;
-//     }
-//     if (err == VK_SUBOPTIMAL_KHR)
-//         vd->SwapChainSuboptimal = true;
-//     else
-//         check_vk_result(err);
-//     wd->SemaphoreIndex = (wd->SemaphoreIndex + 1) % wd->SemaphoreCount; // Now we can use the next set of semaphores
-// }
+	fsd := &wd.FrameSemaphores.Data[wd.SemaphoreIndex]
+	info: vk.PresentInfoKHR = {
+		sType              = .PRESENT_INFO_KHR,
+		waitSemaphoreCount = 1,
+		pWaitSemaphores    = &fsd.RenderCompleteSemaphore,
+		swapchainCount     = 1,
+		pSwapchains        = &wd.Swapchain,
+		pImageIndices      = &present_index,
+	}
+	err = vk.QueuePresentKHR(v.Queue, &info)
+	#partial switch err {
+	case .ERROR_OUT_OF_DATE_KHR:
+		vd.SwapChainNeedRebuild = true
+		return
+	case .SUBOPTIMAL_KHR:
+		vd.SwapChainSuboptimal = true
+	case:
+		check_vk_result(err)
+	}
+	wd.SemaphoreIndex = (wd.SemaphoreIndex + 1) % wd.SemaphoreCount // Now we can use the next set of semaphores
+}
 
-// void ImGui_ImplVulkan_InitMultiViewportSupport()
-// {
-//     ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
-//     if (ImGui::GetIO().BackendFlags & ImGuiBackendFlags_PlatformHasViewports)
-//         IM_ASSERT(platform_io.Platform_CreateVkSurface != nullptr && "Platform needs to setup the CreateVkSurface handler.");
-//     platform_io.Renderer_CreateWindow = ImGui_ImplVulkan_CreateWindow;
-//     platform_io.Renderer_DestroyWindow = ImGui_ImplVulkan_DestroyWindow;
-//     platform_io.Renderer_SetWindowSize = ImGui_ImplVulkan_SetWindowSize;
-//     platform_io.Renderer_RenderWindow = ImGui_ImplVulkan_RenderWindow;
-//     platform_io.Renderer_SwapBuffers = ImGui_ImplVulkan_SwapBuffers;
-// }
+InitMultiViewportSupport :: proc() {
+	platform_io := imgui.GetPlatformIO()
+	if .PlatformHasViewports in imgui.GetIO().BackendFlags {
+		assert(
+			platform_io.Platform_CreateVkSurface != nil,
+			"Platform needs to setup the CreateVkSurface handler.",
+		)
+	}
+	platform_io.Renderer_CreateWindow = CreateWindow
+	platform_io.Renderer_DestroyWindow = DestroyWindow_Internal
+	platform_io.Renderer_SetWindowSize = SetWindowSize
+	platform_io.Renderer_RenderWindow = RenderWindow
+	platform_io.Renderer_SwapBuffers = SwapBuffers
+}
 
-// void ImGui_ImplVulkan_ShutdownMultiViewportSupport()
-// {
-//     ImGui::DestroyPlatformWindows();
-// }
-
-// //-----------------------------------------------------------------------------
-
-// #endif // #ifndef IMGUI_DISABLE
+ShutdownMultiViewportSupport :: #force_inline proc() {
+	imgui.DestroyPlatformWindows()
+}
 
