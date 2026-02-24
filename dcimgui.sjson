@@ -1,0 +1,259 @@
+inputs = [
+	"headers/dcimgui.h",
+]
+
+clang_include_paths = [
+	"headers/imconfig.h"
+]
+
+clang_defines = {
+	"IMGUI_HAS_DOCK" = ""
+}
+
+output_folder = "imgui"
+
+remove_type_prefix = "Im"
+
+remove_macro_prefix = "IM_"
+
+remove_function_prefix = "Im"
+
+remove_type_suffix = "_t"
+
+force_ada_case_types = false
+
+imports_file = "import_dcimgui.odin"
+
+package_name = "ImGui"
+
+type_overrides = {
+	"ImVec2_t" = "[2]f32"
+	"ImVec4_t" = "[4]f32"
+
+	"ImTextureID_Invalid" = "TextureID(0)"
+	"ImDrawCallback_ResetRenderState" = "~uintptr(7)"
+
+	"COL32_WHITE" = "(u32(255)<<COL32_A_SHIFT)|(u32(255)<<COL32_B_SHIFT)|(u32(255)<<COL32_G_SHIFT)|(u32(255)<<COL32_R_SHIFT)"
+	"COL32_BLACK" = "(u32(255)<<COL32_A_SHIFT)|(u32(0)<<COL32_B_SHIFT)|(u32(0)<<COL32_G_SHIFT)|(u32(0)<<COL32_R_SHIFT)"
+	"COL32_BLACK_TRANS" = "(u32(0)<<COL32_A_SHIFT)|(u32(0)<<COL32_B_SHIFT)|(u32(0)<<COL32_G_SHIFT)|(u32(0)<<COL32_R_SHIFT)"
+}
+
+remove_enum_member_prefix = {
+ "ImFontAtlasFlags_" = "ImFontAtlasFlags_"
+ "ImGuiListClipperFlags_" = "ImGuiListClipperFlags_"
+}
+
+bit_setify = {
+	"ImFontAtlasFlags_" = "FontAtlasFlag"
+	"ImGuiWindowFlags_" = "GuiWindowFlag"
+	"ImGuiChildFlags_" = "GuiChildFlag"
+	"ImGuiItemFlags_" = "GuiItemFlag"
+	"ImGuiInputTextFlags_" = "GuiInputTextFlag"
+	"ImGuiTreeNodeFlags_" = "GuiTreeNodeFlag"
+	"ImGuiPopupFlags_" = "GuiPopupFlag"
+	"ImGuiSelectableFlags_" = "GuiSelectableFlag"
+	"ImGuiComboFlags_" = "GuiComboFlag"
+	"ImGuiTabBarFlags_" = "GuiTabBarFlag"
+	"ImGuiTabItemFlags_" = "GuiTabItemFlag"
+	"ImGuiFocusedFlags_" = "GuiFocusedFlag"
+	"ImGuiHoveredFlags_" = "GuiHoveredFlag"
+	"ImGuiDockNodeFlags_" = "GuiDockNodeFlag"
+	"ImGuiDragDropFlags_" = "GuiDragDropFlag"
+	"ImGuiInputFlags_" = "GuiInputFlag"
+	"ImGuiConfigFlags_" = "GuiConfigFlag"
+	"ImGuiBackendFlags_" = "GuiBackendFlag"
+	"ImGuiButtonFlags_" = "GuiButtonFlag"
+	"ImGuiColorEditFlags_" = "GuiColorEditFlag"
+	"ImGuiSliderFlags_" = "GuiSliderFlag"
+	"ImGuiTableFlags_" = "GuiTableFlag"
+	"ImGuiTableColumnFlags_" = "GuiTableColumnFlag"
+	"ImGuiTableRowFlags_" = "GuiTableRowFlag"
+	"ImGuiViewportFlags_" = "GuiViewportFlag"
+	"ImGuiListClipperFlags_" = "GuiListClipperFlag"
+	"ImDrawListFlags_" = "DrawListFlag"
+	"ImFontFlags_" = "FontFlag"
+	"ImGuiMultiSelectFlags_" = "GuiMultiSelectFlag"
+	"ImDrawFlags_" = "DrawFlag"
+}
+
+rename = {
+	"ImGuiContext_t" = "GuiContext"
+
+	"ImGuiTextFilter_ImGuiTextRange_t" = "GuiTextRange"
+
+	"ImDrawCallback_ResetRenderState" = "DrawCallback_ResetRenderState"
+	"ImTextureID_Invalid" = "TextureID_Invalid"
+	"ImFontAtlasRectId_Invalid" = "FontAtlasRectId_Invalid"
+
+	"ImGuiCol_" = "GuiCol"
+	"ImGuiStyleVar_" = "GuiStyleVar"
+	"ImGuiMouseButton_" = "GuiMouseButton"
+	"ImGuiMouseCursor_" = "GuiMouseCursor"
+	"ImGuiCond_" = "GuiCond"
+	"ImGuiTableBgTarget_" = "GuiTableBgTarget"
+	"ImGuiDataType_" = "GuiDataType"
+
+	"ImFontAtlasFlags_" = "FontAtlasFlags"
+	"ImGuiWindowFlags_" = "GuiWindowFlags"
+	"ImGuiChildFlags_" = "GuiChildFlags"
+	"ImGuiItemFlags_" = "GuiItemFlags"
+	"ImGuiInputTextFlags_" = "GuiInputTextFlags"
+	"ImGuiTreeNodeFlags_" = "GuiTreeNodeFlags"
+	"ImGuiPopupFlags_" = "GuiPopupFlags"
+	"ImGuiSelectableFlags_" = "GuiSelectableFlags"
+	"ImGuiComboFlags_" = "GuiComboFlags"
+	"ImGuiTabBarFlags_" = "GuiTabBarFlags"
+	"ImGuiTabItemFlags_" = "GuiTabItemFlags"
+	"ImGuiFocusedFlags_" = "GuiFocusedFlags"
+	"ImGuiHoveredFlags_" = "GuiHoveredFlags"
+	"ImGuiDockNodeFlags_" = "GuiDockNodeFlags"
+	"ImGuiDragDropFlags_" = "GuiDragDropFlags"
+	"ImGuiInputFlags_" = "GuiInputFlags"
+	"ImGuiConfigFlags_" = "GuiConfigFlags"
+	"ImGuiBackendFlags_" = "GuiBackendFlags"
+	"ImGuiButtonFlags_" = "GuiButtonFlags"
+	"ImGuiColorEditFlags_" = "GuiColorEditFlags"
+	"ImGuiSliderFlags_" = "GuiSliderFlags"
+	"ImGuiTableFlags_" = "GuiTableFlags"
+	"ImGuiTableColumnFlags_" = "GuiTableColumnFlags"
+	"ImGuiTableRowFlags_" = "GuiTableRowFlags"
+	"ImGuiViewportFlags_" = "GuiViewportFlags"
+	"ImGuiListClipperFlags_" = "GuiListClipperFlags"
+	"ImDrawListFlags_" = "DrawListFlags"
+	"ImFontFlags_" = "FontFlags"
+	"ImGuiMultiSelectFlags_" = "GuiMultiSelectFlags"
+	"ImDrawFlags_" = "DrawFlags"
+}
+
+remove = [
+	"IM_COL32_WHITE"
+	"IM_COL32_BLACK"
+	"IM_COL32_BLACK_TRANS"
+
+	"ImDrawListSharedData_t"
+	"ImFontAtlasBuilder_t"
+	"ImFontLoader_t"
+	"ImGuiContext_t"
+
+	"ImGuiDir"
+	"ImGuiKey"
+	"ImGuiMouseSource"
+	"ImGuiSortDirection"
+	"ImGuiCol"
+	"ImGuiCond"
+	"ImGuiDataType"
+	"ImGuiMouseButton"
+	"ImGuiMouseCursor"
+	"ImGuiStyleVar"
+	"ImGuiTableBgTarget"
+	"ImDrawTextFlags"
+
+	"ImDrawFlags"
+	"ImDrawListFlags"
+	"ImFontFlags"
+	"ImFontAtlasFlags"
+	"ImGuiBackendFlags"
+	"ImGuiButtonFlags"
+	"ImGuiChildFlags"
+	"ImGuiColorEditFlags"
+	"ImGuiConfigFlags"
+	"ImGuiComboFlags"
+	"ImGuiDockNodeFlags"
+	"ImGuiDragDropFlags"
+	"ImGuiFocusedFlags"
+	"ImGuiHoveredFlags"
+	"ImGuiInputFlags"
+	"ImGuiInputTextFlags"
+	"ImGuiItemFlags"
+	"ImGuiListClipperFlags"
+	"ImGuiPopupFlags"
+	"ImGuiMultiSelectFlags"
+	"ImGuiSelectableFlags"
+	"ImGuiSliderFlags"
+	"ImGuiTabBarFlags"
+	"ImGuiTabItemFlags"
+	"ImGuiTableFlags"
+	"ImGuiTableColumnFlags"
+	"ImGuiTableRowFlags"
+	"ImGuiTreeNodeFlags"
+	"ImGuiViewportFlags"
+	"ImGuiWindowFlags"
+
+	"ImVector_ImGuiTextRange_t"
+	"ImVector_char_t"
+	"ImVector_ImGuiStoragePair_t"
+	"ImVector_ImGuiSelectionRequest_t"
+	"ImVector_ImDrawChannel_t"
+	"ImVector_ImDrawCmd_t"
+	"ImVector_ImDrawIdx_t"
+	"ImVector_ImDrawVert_t"
+	"ImVector_ImVec2_t"
+	"ImVector_ImVec4_t"
+	"ImVector_ImTextureRef_t"
+	"ImVector_ImU8_t"
+	"ImVector_ImDrawListPtr_t"
+	"ImVector_ImTextureRect_t"
+	"ImVector_ImU32_t"
+	"ImVector_ImWchar_t"
+	"ImVector_ImFontPtr_t"
+	"ImVector_ImFontConfig_t"
+	"ImVector_ImDrawListSharedDataPtr_t"
+	"ImVector_float_t"
+	"ImVector_ImU16_t"
+	"ImVector_ImFontGlyph_t"
+	"ImVector_ImFontConfigPtr_t"
+	"ImVector_ImGuiPlatformMonitor_t"
+	"ImVector_ImTextureDataPtr_t"
+	"ImVector_ImGuiViewportPtr_t"
+
+	"IM_ARRAYSIZE"
+]
+
+replace = {
+	"ImGuiTextFilter_ImGuiTextRange" = "GuiTextRange"
+
+	"ImS8" = "i8"
+	"ImU8" = "u8"
+	"ImS16" = "i16"
+	"ImU16" = "u16"
+	"ImS32" = "i32"
+	"ImU32" = "u32"
+	"ImS64" = "i64"
+	"ImU64" = "u64"
+
+	"ImVector_ImGuiTextRange" = "Vector(GuiTextRange)"
+	"ImVector_char" = "Vector(u8)"
+	"ImVector_ImGuiStoragePair" = "Vector(GuiStoragePair)"
+	"ImVector_ImGuiSelectionRequest" = "Vector(GuiSelectionRequest)"
+	"ImVector_ImDrawChannel" = "Vector(DrawChannel)"
+	"ImVector_ImDrawCmd" = "Vector(DrawCmd)"
+	"ImVector_ImDrawIdx" = "Vector(DrawIdx)"
+	"ImVector_ImDrawVert" = "Vector(DrawVert)"
+	"ImVector_ImVec2" = "Vector(Vec2)"
+	"ImVector_ImVec4" = "Vector(Vec4)"
+	"ImVector_ImTextureRef" = "Vector(TextureRef)"
+	"ImVector_ImU8" = "Vector(u8)"
+	"ImVector_ImDrawListPtr" = "Vector(^DrawList)"
+	"ImVector_ImTextureRect" = "Vector(TextureRect)"
+	"ImVector_ImU32" = "Vector(u32)"
+	"ImVector_ImWchar" = "Vector(Wchar)"
+	"ImVector_ImFontPtr" = "Vector(^Font)"
+	"ImVector_ImFontConfig" = "Vector(FontConfig)"
+	"ImVector_ImDrawListSharedDataPtr" = "Vector(^DrawListSharedData)"
+	"ImVector_float" = "Vector(f32)"
+	"ImVector_ImU16" = "Vector(u16)"
+	"ImVector_ImFontGlyph" = "Vector(FontGlyph)"
+	"ImVector_ImFontConfigPtr" = "Vector(^FontConfig)"
+	"ImVector_ImGuiPlatformMonitor" = "Vector(GuiPlatformMonitor)"
+	"ImVector_ImTextureDataPtr" = "Vector(^TextureData)"
+	"ImVector_ImGuiViewportPtr" = "Vector(^GuiViewport)"
+}
+
+deanon_enums = {
+	"ImGuiSortDirection_None" = "GuiSortDirection"
+	"ImGuiKey_None" = "GuiKey"
+	"ImGuiDir_None" = "GuiDir"
+	"ImGuiMouseSource_Mouse" = "GuiMouseSource"
+}
+
+procedures_at_end = true
