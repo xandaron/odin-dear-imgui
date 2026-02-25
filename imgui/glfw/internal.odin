@@ -10,7 +10,6 @@ import "core:sys/windows"
 import "vendor:glfw"
 import glfwBindings "vendor:glfw/bindings"
 import vk "vendor:vulkan"
-import x11 "vendor:x11/xlib"
 
 internal_allocator: mem.Allocator
 ContextMap: map[glfw.WindowHandle]^imgui.GuiContext

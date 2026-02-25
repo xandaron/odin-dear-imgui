@@ -160,8 +160,8 @@ GuiWindowFlag :: enum i32 {
 // Flags for ImGui::Begin()
 // (Those are per-window flags. There are shared flags in ImGuiIO: io.ConfigWindowsResizeFromEdges and io.ConfigWindowsMoveFromTitleBarOnly)
 GuiWindowFlags              :: bit_set[GuiWindowFlag; i32]
-GUIWINDOWFLAGS_NODECORATION :: GuiWindowFlags {.NoTitleBar, .NoResize, .NoScrollbar, .NoCollapse}
 GUIWINDOWFLAGS_NONAV        :: GuiWindowFlags {.NoNavInputs, .NoNavFocus}
+GUIWINDOWFLAGS_NODECORATION :: GuiWindowFlags {.NoTitleBar, .NoResize, .NoScrollbar, .NoCollapse}
 GUIWINDOWFLAGS_NOINPUTS     :: GuiWindowFlags {.NoMouseInputs, .NoNavInputs, .NoNavFocus}
 
 GuiChildFlag :: enum i32 {
@@ -292,8 +292,8 @@ GuiPopupFlag :: enum i32 {
 // - IMPORTANT: If you ever used the left mouse button with BeginPopupContextXXX() helpers before 1.92.6: Read "API BREAKING CHANGES" 2026/01/07 (1.92.6) entry in imgui.cpp or GitHub topic #9157.
 // - Multiple buttons currently cannot be combined/or-ed in those functions (we could allow it later).
 GuiPopupFlags                   :: bit_set[GuiPopupFlag; i32]
-GUIPOPUPFLAGS_ANYPOPUP          :: GuiPopupFlags {.AnyPopupId, .AnyPopupLevel}
 GUIPOPUPFLAGS_MOUSEBUTTONMIDDLE :: GuiPopupFlags {.MouseButtonLeft, .MouseButtonRight}
+GUIPOPUPFLAGS_ANYPOPUP          :: GuiPopupFlags {.AnyPopupId, .AnyPopupLevel}
 GUIPOPUPFLAGS_MOUSEBUTTONMASK_  :: GuiPopupFlags {.MouseButtonLeft, .MouseButtonRight}
 GUIPOPUPFLAGS_INVALIDMASK_      :: GuiPopupFlags {.MouseButtonShift_}
 
@@ -914,12 +914,12 @@ GuiColorEditFlag :: enum i32 {
 
 // Flags for ColorEdit3() / ColorEdit4() / ColorPicker3() / ColorPicker4() / ColorButton()
 GuiColorEditFlags                 :: bit_set[GuiColorEditFlag; i32]
-GUICOLOREDITFLAGS_ALPHAMASK_      :: GuiColorEditFlags {.NoAlpha, .AlphaOpaque, .AlphaNoBg, .AlphaPreviewHalf}
-GUICOLOREDITFLAGS_INPUTMASK_      :: GuiColorEditFlags {.InputRGB, .InputHSV}
 GUICOLOREDITFLAGS_DEFAULTOPTIONS_ :: GuiColorEditFlags {.DisplayRGB, .Uint8, .PickerHueBar, .InputRGB}
+GUICOLOREDITFLAGS_ALPHAMASK_      :: GuiColorEditFlags {.NoAlpha, .AlphaOpaque, .AlphaNoBg, .AlphaPreviewHalf}
 GUICOLOREDITFLAGS_DISPLAYMASK_    :: GuiColorEditFlags {.DisplayRGB, .DisplayHSV, .DisplayHex}
-GUICOLOREDITFLAGS_PICKERMASK_     :: GuiColorEditFlags {.PickerHueBar, .PickerHueWheel}
 GUICOLOREDITFLAGS_DATATYPEMASK_   :: GuiColorEditFlags {.Uint8, .Float}
+GUICOLOREDITFLAGS_PICKERMASK_     :: GuiColorEditFlags {.PickerHueBar, .PickerHueWheel}
+GUICOLOREDITFLAGS_INPUTMASK_      :: GuiColorEditFlags {.InputRGB, .InputHSV}
 
 GuiSliderFlag :: enum i32 {
 	Logarithmic     = 5,  // Make the widget logarithmic (linear otherwise). Consider using ImGuiSliderFlags_NoRoundToFormat with this if using a format-string with small amount of digits.
@@ -936,8 +936,8 @@ GuiSliderFlag :: enum i32 {
 // We use the same sets of flags for DragXXX() and SliderXXX() functions as the features are the same and it makes it easier to swap them.
 // (Those are per-item flags. There is shared behavior flag too: ImGuiIO: io.ConfigDragClickToInputText)
 GuiSliderFlags              :: bit_set[GuiSliderFlag; i32]
-GUISLIDERFLAGS_INVALIDMASK_ :: GuiSliderFlags {}
 GUISLIDERFLAGS_ALWAYSCLAMP  :: GuiSliderFlags {.ClampOnInput, .ClampZeroRange}
+GUISLIDERFLAGS_INVALIDMASK_ :: GuiSliderFlags {}
 
 // Identify a mouse button.
 // Those values are guaranteed to be stable and we frequently use 0/1 directly. Named enums provided for convenience.
@@ -1060,12 +1060,12 @@ GuiTableFlag :: enum i32 {
 // - Read on documentation at the top of imgui_tables.cpp for details.
 GuiTableFlags                   :: bit_set[GuiTableFlag; i32]
 GUITABLEFLAGS_BORDERSH          :: GuiTableFlags {.BordersInnerH, .BordersOuterH}
-GUITABLEFLAGS_SIZINGMASK_       :: GuiTableFlags {.SizingFixedFit, .SizingFixedSame, .SizingStretchSame}
-GUITABLEFLAGS_BORDERSINNER      :: GuiTableFlags {.BordersInnerH, .BordersInnerV}
-GUITABLEFLAGS_BORDERS           :: GuiTableFlags {.BordersInnerH, .BordersOuterH, .BordersInnerV, .BordersOuterV}
 GUITABLEFLAGS_BORDERSV          :: GuiTableFlags {.BordersInnerV, .BordersOuterV}
-GUITABLEFLAGS_SIZINGSTRETCHPROP :: GuiTableFlags {.SizingFixedFit, .SizingFixedSame}
+GUITABLEFLAGS_BORDERSINNER      :: GuiTableFlags {.BordersInnerH, .BordersInnerV}
 GUITABLEFLAGS_BORDERSOUTER      :: GuiTableFlags {.BordersOuterH, .BordersOuterV}
+GUITABLEFLAGS_BORDERS           :: GuiTableFlags {.BordersInnerH, .BordersOuterH, .BordersInnerV, .BordersOuterV}
+GUITABLEFLAGS_SIZINGSTRETCHPROP :: GuiTableFlags {.SizingFixedFit, .SizingFixedSame}
+GUITABLEFLAGS_SIZINGMASK_       :: GuiTableFlags {.SizingFixedFit, .SizingFixedSame, .SizingStretchSame}
 
 GuiTableColumnFlag :: enum i32 {
 	Disabled             = 0,  // Overriding/master disable flag: hide column, won't show in context menu (unlike calling TableSetColumnEnabled() which manipulates the user accessible state)
@@ -1760,11 +1760,11 @@ DrawFlag :: enum i32 {
 // (Legacy: bit 0 must always correspond to ImDrawFlags_Closed to be backward compatible with old API using a bool. Bits 1..3 must be unused)
 DrawFlags                      :: bit_set[DrawFlag; i32]
 DRAWFLAGS_ROUNDCORNERSTOP      :: DrawFlags {.RoundCornersTopLeft, .RoundCornersTopRight}
-DRAWFLAGS_ROUNDCORNERSLEFT     :: DrawFlags {.RoundCornersTopLeft, .RoundCornersBottomLeft}
 DRAWFLAGS_ROUNDCORNERSBOTTOM   :: DrawFlags {.RoundCornersBottomLeft, .RoundCornersBottomRight}
+DRAWFLAGS_ROUNDCORNERSLEFT     :: DrawFlags {.RoundCornersTopLeft, .RoundCornersBottomLeft}
+DRAWFLAGS_ROUNDCORNERSRIGHT    :: DrawFlags {.RoundCornersTopRight, .RoundCornersBottomRight}
 DRAWFLAGS_ROUNDCORNERSALL      :: DrawFlags {.RoundCornersTopLeft, .RoundCornersTopRight, .RoundCornersBottomLeft, .RoundCornersBottomRight}
 DRAWFLAGS_ROUNDCORNERSDEFAULT_ :: DrawFlags {.RoundCornersTopLeft, .RoundCornersTopRight, .RoundCornersBottomLeft, .RoundCornersBottomRight}
-DRAWFLAGS_ROUNDCORNERSRIGHT    :: DrawFlags {.RoundCornersTopRight, .RoundCornersBottomRight}
 DRAWFLAGS_ROUNDCORNERSMASK_    :: DrawFlags {.RoundCornersTopLeft, .RoundCornersTopRight, .RoundCornersBottomLeft, .RoundCornersBottomRight, .RoundCornersNone}
 
 DrawListFlag :: enum i32 {
@@ -2496,26 +2496,21 @@ foreign lib {
 	Gui_GetIDInt  :: proc(int_id: i32) -> GuiID ---
 
 	// Widgets: Text
-	Gui_TextUnformatted         :: proc(text: cstring) ---                                    // Implied text_end = NULL
-	Gui_TextUnformattedEx       :: proc(text: cstring /* = NULL */, text_end: cstring /* = NULL */) --- // raw text without formatting. Roughly equivalent to Text("%s", text) but: A) doesn't require null terminated string if 'text_end' is specified, B) it's faster, no memory copy is done, no buffer size limits, recommended for long chunks of text.
-	Gui_Text                    :: proc(fmt: cstring, #c_vararg _: ..any) ---                 // formatted text
-	Gui_TextV                   :: proc(fmt: cstring, args: c.va_list) ---
-	Gui_TextColored             :: proc(col: Vec4, fmt: cstring, #c_vararg _: ..any) ---      // shortcut for PushStyleColor(ImGuiCol_Text, col); Text(fmt, ...); PopStyleColor();
-	Gui_TextColoredUnformatted  :: proc(col: Vec4, text: cstring) ---                         // shortcut for PushStyleColor(ImGuiCol_Text, col); Text(fmt, ...); PopStyleColor();
-	Gui_TextColoredV            :: proc(col: Vec4, fmt: cstring, args: c.va_list) ---
-	Gui_TextDisabled            :: proc(fmt: cstring, #c_vararg _: ..any) ---                 // shortcut for PushStyleColor(ImGuiCol_Text, style.Colors[ImGuiCol_TextDisabled]); Text(fmt, ...); PopStyleColor();
-	Gui_TextDisabledUnformatted :: proc(text: cstring) ---                                    // shortcut for PushStyleColor(ImGuiCol_Text, style.Colors[ImGuiCol_TextDisabled]); Text(fmt, ...); PopStyleColor();
-	Gui_TextDisabledV           :: proc(fmt: cstring, args: c.va_list) ---
-	Gui_TextWrapped             :: proc(fmt: cstring, #c_vararg _: ..any) ---                 // shortcut for PushTextWrapPos(0.0f); Text(fmt, ...); PopTextWrapPos();. Note that this won't work on an auto-resizing window if there's no other widgets to extend the window width, yoy may need to set a size using SetNextWindowSize().
-	Gui_TextWrappedUnformatted  :: proc(text: cstring) ---                                    // shortcut for PushTextWrapPos(0.0f); Text(fmt, ...); PopTextWrapPos();. Note that this won't work on an auto-resizing window if there's no other widgets to extend the window width, yoy may need to set a size using SetNextWindowSize().
-	Gui_TextWrappedV            :: proc(fmt: cstring, args: c.va_list) ---
-	Gui_LabelText               :: proc(label: cstring, fmt: cstring, #c_vararg _: ..any) --- // display text+label aligned the same way as value+label widgets
-	Gui_LabelTextUnformatted    :: proc(label: cstring, text: cstring) ---                    // display text+label aligned the same way as value+label widgets
-	Gui_LabelTextV              :: proc(label: cstring, fmt: cstring, args: c.va_list) ---
-	Gui_BulletText              :: proc(fmt: cstring, #c_vararg _: ..any) ---                 // shortcut for Bullet()+Text()
-	Gui_BulletTextUnformatted   :: proc(text: cstring) ---                                    // shortcut for Bullet()+Text()
-	Gui_BulletTextV             :: proc(fmt: cstring, args: c.va_list) ---
-	Gui_SeparatorText           :: proc(label: cstring) ---                                   // currently: formatted text with a horizontal line
+	Gui_TextUnformatted   :: proc(text: cstring) ---                                    // Implied text_end = NULL
+	Gui_TextUnformattedEx :: proc(text: cstring /* = NULL */, text_end: cstring /* = NULL */) --- // raw text without formatting. Roughly equivalent to Text("%s", text) but: A) doesn't require null terminated string if 'text_end' is specified, B) it's faster, no memory copy is done, no buffer size limits, recommended for long chunks of text.
+	Gui_Text              :: proc(fmt: cstring, #c_vararg _: ..any) ---                 // formatted text
+	Gui_TextV             :: proc(fmt: cstring, args: c.va_list) ---
+	Gui_TextColored       :: proc(col: Vec4, fmt: cstring, #c_vararg _: ..any) ---      // shortcut for PushStyleColor(ImGuiCol_Text, col); Text(fmt, ...); PopStyleColor();
+	Gui_TextColoredV      :: proc(col: Vec4, fmt: cstring, args: c.va_list) ---
+	Gui_TextDisabled      :: proc(fmt: cstring, #c_vararg _: ..any) ---                 // shortcut for PushStyleColor(ImGuiCol_Text, style.Colors[ImGuiCol_TextDisabled]); Text(fmt, ...); PopStyleColor();
+	Gui_TextDisabledV     :: proc(fmt: cstring, args: c.va_list) ---
+	Gui_TextWrapped       :: proc(fmt: cstring, #c_vararg _: ..any) ---                 // shortcut for PushTextWrapPos(0.0f); Text(fmt, ...); PopTextWrapPos();. Note that this won't work on an auto-resizing window if there's no other widgets to extend the window width, yoy may need to set a size using SetNextWindowSize().
+	Gui_TextWrappedV      :: proc(fmt: cstring, args: c.va_list) ---
+	Gui_LabelText         :: proc(label: cstring, fmt: cstring, #c_vararg _: ..any) --- // display text+label aligned the same way as value+label widgets
+	Gui_LabelTextV        :: proc(label: cstring, fmt: cstring, args: c.va_list) ---
+	Gui_BulletText        :: proc(fmt: cstring, #c_vararg _: ..any) ---                 // shortcut for Bullet()+Text()
+	Gui_BulletTextV       :: proc(fmt: cstring, args: c.va_list) ---
+	Gui_SeparatorText     :: proc(label: cstring) ---                                   // currently: formatted text with a horizontal line
 
 	// Widgets: Main
 	// - Most widgets return true when the value has been changed or when pressed/selected
@@ -2677,26 +2672,22 @@ foreign lib {
 	// - TreeNode functions return true when the node is open, in which case you need to also call TreePop() when you are finished displaying the tree node contents.
 	Gui_TreeNode                  :: proc(label: cstring) -> bool ---
 	Gui_TreeNodeStr               :: proc(str_id: cstring, fmt: cstring, #c_vararg _: ..any) -> bool --- // helper variation to easily decorrelate the id from the displayed string. Read the FAQ about why and how to use ID. to align arbitrary text at the same level as a TreeNode() you can use Bullet().
-	Gui_TreeNodeStrUnformatted    :: proc(str_id: cstring, text: cstring) -> bool --- // helper variation to easily decorrelate the id from the displayed string. Read the FAQ about why and how to use ID. to align arbitrary text at the same level as a TreeNode() you can use Bullet().
 	Gui_TreeNodePtr               :: proc(ptr_id: rawptr, fmt: cstring, #c_vararg _: ..any) -> bool --- // "
-	Gui_TreeNodePtrUnformatted    :: proc(ptr_id: rawptr, text: cstring) -> bool ---  // "
 	Gui_TreeNodeV                 :: proc(str_id: cstring, fmt: cstring, args: c.va_list) -> bool ---
 	Gui_TreeNodeVPtr              :: proc(ptr_id: rawptr, fmt: cstring, args: c.va_list) -> bool ---
 	Gui_TreeNodeEx                :: proc(label: cstring /* = 0 */, flags: GuiTreeNodeFlags /* = 0 */) -> bool ---
 	Gui_TreeNodeExStr             :: proc(str_id: cstring, flags: GuiTreeNodeFlags, fmt: cstring, #c_vararg _: ..any) -> bool ---
-	Gui_TreeNodeExStrUnformatted  :: proc(str_id: cstring, flags: GuiTreeNodeFlags, text: cstring) -> bool ---
 	Gui_TreeNodeExPtr             :: proc(ptr_id: rawptr, flags: GuiTreeNodeFlags, fmt: cstring, #c_vararg _: ..any) -> bool ---
-	Gui_TreeNodeExPtrUnformatted  :: proc(ptr_id: rawptr, flags: GuiTreeNodeFlags, text: cstring) -> bool ---
 	Gui_TreeNodeExV               :: proc(str_id: cstring, flags: GuiTreeNodeFlags, fmt: cstring, args: c.va_list) -> bool ---
 	Gui_TreeNodeExVPtr            :: proc(ptr_id: rawptr, flags: GuiTreeNodeFlags, fmt: cstring, args: c.va_list) -> bool ---
-	Gui_TreePush                  :: proc(str_id: cstring) ---                        // ~ Indent()+PushID(). Already called by TreeNode() when returning true, but you can call TreePush/TreePop yourself if desired.
-	Gui_TreePushPtr               :: proc(ptr_id: rawptr) ---                         // "
-	Gui_TreePop                   :: proc() ---                                       // ~ Unindent()+PopID()
-	Gui_GetTreeNodeToLabelSpacing :: proc() -> f32 ---                                // horizontal distance preceding label when using TreeNode*() or Bullet() == (g.FontSize + style.FramePadding.x*2) for a regular unframed TreeNode
+	Gui_TreePush                  :: proc(str_id: cstring) ---   // ~ Indent()+PushID(). Already called by TreeNode() when returning true, but you can call TreePush/TreePop yourself if desired.
+	Gui_TreePushPtr               :: proc(ptr_id: rawptr) ---    // "
+	Gui_TreePop                   :: proc() ---                  // ~ Unindent()+PopID()
+	Gui_GetTreeNodeToLabelSpacing :: proc() -> f32 ---           // horizontal distance preceding label when using TreeNode*() or Bullet() == (g.FontSize + style.FramePadding.x*2) for a regular unframed TreeNode
 	Gui_CollapsingHeader          :: proc(label: cstring /* = 0 */, flags: GuiTreeNodeFlags /* = 0 */) -> bool --- // if returning 'true' the header is open. doesn't indent nor push on ID stack. user doesn't have to call TreePop().
 	Gui_CollapsingHeaderBoolPtr   :: proc(label: cstring /* = 0 */, p_visible: ^bool /* = 0 */, flags: GuiTreeNodeFlags /* = 0 */) -> bool --- // when 'p_visible != NULL': if '*p_visible==true' display an additional small close button on upper right of the header which will set the bool to false when clicked, if '*p_visible==false' don't display the header.
 	Gui_SetNextItemOpen           :: proc(is_open: bool /* = 0 */, cond: GuiCond /* = 0 */) --- // set next TreeNode/CollapsingHeader open state.
-	Gui_SetNextItemStorageID      :: proc(storage_id: GuiID) ---                      // set id to use for open/close storage (default to same as item id).
+	Gui_SetNextItemStorageID      :: proc(storage_id: GuiID) --- // set id to use for open/close storage (default to same as item id).
 
 	// Widgets: Selectables
 	// - A selectable highlights when hovered, and can display another color when selected.
@@ -2763,20 +2754,18 @@ foreign lib {
 	// - Tooltips are windows following the mouse. They do not take focus away.
 	// - A tooltip window can contain items of any types.
 	// - SetTooltip() is more or less a shortcut for the 'if (BeginTooltip()) { Text(...); EndTooltip(); }' idiom (with a subtlety that it discard any previously submitted tooltip)
-	Gui_BeginTooltip          :: proc() -> bool ---                         // begin/append a tooltip window.
-	Gui_EndTooltip            :: proc() ---                                 // only call EndTooltip() if BeginTooltip()/BeginItemTooltip() returns true!
-	Gui_SetTooltip            :: proc(fmt: cstring, #c_vararg _: ..any) --- // set a text-only tooltip. Often used after a ImGui::IsItemHovered() check. Override any previous call to SetTooltip().
-	Gui_SetTooltipUnformatted :: proc(text: cstring) ---                    // set a text-only tooltip. Often used after a ImGui::IsItemHovered() check. Override any previous call to SetTooltip().
-	Gui_SetTooltipV           :: proc(fmt: cstring, args: c.va_list) ---
+	Gui_BeginTooltip :: proc() -> bool ---                         // begin/append a tooltip window.
+	Gui_EndTooltip   :: proc() ---                                 // only call EndTooltip() if BeginTooltip()/BeginItemTooltip() returns true!
+	Gui_SetTooltip   :: proc(fmt: cstring, #c_vararg _: ..any) --- // set a text-only tooltip. Often used after a ImGui::IsItemHovered() check. Override any previous call to SetTooltip().
+	Gui_SetTooltipV  :: proc(fmt: cstring, args: c.va_list) ---
 
 	// Tooltips: helpers for showing a tooltip when hovering an item
 	// - BeginItemTooltip() is a shortcut for the 'if (IsItemHovered(ImGuiHoveredFlags_ForTooltip) && BeginTooltip())' idiom.
 	// - SetItemTooltip() is a shortcut for the 'if (IsItemHovered(ImGuiHoveredFlags_ForTooltip)) { SetTooltip(...); }' idiom.
 	// - Where 'ImGuiHoveredFlags_ForTooltip' itself is a shortcut to use 'style.HoverFlagsForTooltipMouse' or 'style.HoverFlagsForTooltipNav' depending on active input type. For mouse it defaults to 'ImGuiHoveredFlags_Stationary | ImGuiHoveredFlags_DelayShort'.
-	Gui_BeginItemTooltip          :: proc() -> bool ---                         // begin/append a tooltip window if preceding item was hovered.
-	Gui_SetItemTooltip            :: proc(fmt: cstring, #c_vararg _: ..any) --- // set a text-only tooltip if preceding item was hovered. override any previous call to SetTooltip().
-	Gui_SetItemTooltipUnformatted :: proc(text: cstring) ---                    // set a text-only tooltip if preceding item was hovered. override any previous call to SetTooltip().
-	Gui_SetItemTooltipV           :: proc(fmt: cstring, args: c.va_list) ---
+	Gui_BeginItemTooltip :: proc() -> bool ---                         // begin/append a tooltip window if preceding item was hovered.
+	Gui_SetItemTooltip   :: proc(fmt: cstring, #c_vararg _: ..any) --- // set a text-only tooltip if preceding item was hovered. override any previous call to SetTooltip().
+	Gui_SetItemTooltipV  :: proc(fmt: cstring, args: c.va_list) ---
 
 	// Popups, Modals
 	//  - They block normal mouse hovering detection (and therefore most mouse interactions) behind them.
@@ -2939,14 +2928,13 @@ foreign lib {
 
 	// Logging/Capture
 	// - All text output from the interface can be captured into tty/file/clipboard. By default, tree nodes are automatically opened during logging.
-	Gui_LogToTTY           :: proc(auto_open_depth: i32 /* = -1 */) ---  // start logging to tty (stdout)
-	Gui_LogToFile          :: proc(auto_open_depth: i32 /* = -1 */, filename: cstring /* = NULL */) --- // start logging to file
-	Gui_LogToClipboard     :: proc(auto_open_depth: i32 /* = -1 */) ---  // start logging to OS clipboard
-	Gui_LogFinish          :: proc() ---                                 // stop logging (close file, etc.)
-	Gui_LogButtons         :: proc() ---                                 // helper to display buttons for logging to tty/file/clipboard
-	Gui_LogText            :: proc(fmt: cstring, #c_vararg _: ..any) --- // pass text data straight to log (without being displayed)
-	Gui_LogTextUnformatted :: proc(text: cstring) ---                    // pass text data straight to log (without being displayed)
-	Gui_LogTextV           :: proc(fmt: cstring, args: c.va_list) ---
+	Gui_LogToTTY       :: proc(auto_open_depth: i32 /* = -1 */) ---  // start logging to tty (stdout)
+	Gui_LogToFile      :: proc(auto_open_depth: i32 /* = -1 */, filename: cstring /* = NULL */) --- // start logging to file
+	Gui_LogToClipboard :: proc(auto_open_depth: i32 /* = -1 */) ---  // start logging to OS clipboard
+	Gui_LogFinish      :: proc() ---                                 // stop logging (close file, etc.)
+	Gui_LogButtons     :: proc() ---                                 // helper to display buttons for logging to tty/file/clipboard
+	Gui_LogText        :: proc(fmt: cstring, #c_vararg _: ..any) --- // pass text data straight to log (without being displayed)
+	Gui_LogTextV       :: proc(fmt: cstring, args: c.va_list) ---
 
 	// Drag and Drop
 	// - On source items, call BeginDragDropSource(), if it returns true also call SetDragDropPayload() + EndDragDropSource().
@@ -3132,7 +3120,6 @@ foreign lib {
 	Gui_DebugStartItemPicker           :: proc() ---
 	Gui_DebugCheckVersionAndDataLayout :: proc(version_str: cstring, sz_io: c.size_t, sz_style: c.size_t, sz_vec2: c.size_t, sz_vec4: c.size_t, sz_drawvert: c.size_t, sz_drawidx: c.size_t) -> bool --- // This is called by IMGUI_CHECKVERSION() macro.
 	Gui_DebugLog                       :: proc(fmt: cstring, #c_vararg _: ..any) --- // Call via IMGUI_DEBUG_LOG() for maximum stripping in caller code!
-	Gui_DebugLogUnformatted            :: proc(text: cstring) ---                    // Call via IMGUI_DEBUG_LOG() for maximum stripping in caller code!
 	Gui_DebugLogV                      :: proc(fmt: cstring, args: c.va_list) ---
 
 	// Memory Allocators

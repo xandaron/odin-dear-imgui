@@ -499,11 +499,8 @@ IM_MSVC_RUNTIME_CHECKS_RESTORE
 
 // Helpers: Formatting
 CIMGUI_API int         cImFormatString(char* buf, size_t buf_size, const char* fmt, ...) IM_FMTARGS(3);
-// Helpers: Formatting
-CIMGUI_API int         cImFormatStringUnformatted(char* buf, size_t buf_size, const char* text);
 CIMGUI_API int         cImFormatStringV(char* buf, size_t buf_size, const char* fmt, va_list args) IM_FMTLIST(3);
 CIMGUI_API void        cImFormatStringToTempBuffer(const char** out_buf, const char** out_buf_end, const char* fmt, ...) IM_FMTARGS(3);
-CIMGUI_API void        cImFormatStringToTempBufferUnformatted(const char** out_buf, const char** out_buf_end, const char* text);
 CIMGUI_API void        cImFormatStringToTempBufferV(const char** out_buf, const char** out_buf_end, const char* fmt, va_list args) IM_FMTLIST(3);
 CIMGUI_API const char* cImParseFormatFindStart(const char* format);
 CIMGUI_API const char* cImParseFormatFindEnd(const char* format);

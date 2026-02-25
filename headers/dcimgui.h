@@ -654,19 +654,14 @@ CIMGUI_API void ImGui_TextUnformattedEx(const char* text, const char* text_end /
 CIMGUI_API void ImGui_Text(const char* fmt, ...) IM_FMTARGS(1);                                    // formatted text
 CIMGUI_API void ImGui_TextV(const char* fmt, va_list args) IM_FMTLIST(1);
 CIMGUI_API void ImGui_TextColored(ImVec4 col, const char* fmt, ...) IM_FMTARGS(2);                 // shortcut for PushStyleColor(ImGuiCol_Text, col); Text(fmt, ...); PopStyleColor();
-CIMGUI_API void ImGui_TextColoredUnformatted(ImVec4 col, const char* text);                        // shortcut for PushStyleColor(ImGuiCol_Text, col); Text(fmt, ...); PopStyleColor();
 CIMGUI_API void ImGui_TextColoredV(ImVec4 col, const char* fmt, va_list args) IM_FMTLIST(2);
 CIMGUI_API void ImGui_TextDisabled(const char* fmt, ...) IM_FMTARGS(1);                            // shortcut for PushStyleColor(ImGuiCol_Text, style.Colors[ImGuiCol_TextDisabled]); Text(fmt, ...); PopStyleColor();
-CIMGUI_API void ImGui_TextDisabledUnformatted(const char* text);                                   // shortcut for PushStyleColor(ImGuiCol_Text, style.Colors[ImGuiCol_TextDisabled]); Text(fmt, ...); PopStyleColor();
 CIMGUI_API void ImGui_TextDisabledV(const char* fmt, va_list args) IM_FMTLIST(1);
 CIMGUI_API void ImGui_TextWrapped(const char* fmt, ...) IM_FMTARGS(1);                             // shortcut for PushTextWrapPos(0.0f); Text(fmt, ...); PopTextWrapPos();. Note that this won't work on an auto-resizing window if there's no other widgets to extend the window width, yoy may need to set a size using SetNextWindowSize().
-CIMGUI_API void ImGui_TextWrappedUnformatted(const char* text);                                    // shortcut for PushTextWrapPos(0.0f); Text(fmt, ...); PopTextWrapPos();. Note that this won't work on an auto-resizing window if there's no other widgets to extend the window width, yoy may need to set a size using SetNextWindowSize().
 CIMGUI_API void ImGui_TextWrappedV(const char* fmt, va_list args) IM_FMTLIST(1);
 CIMGUI_API void ImGui_LabelText(const char* label, const char* fmt, ...) IM_FMTARGS(2);            // display text+label aligned the same way as value+label widgets
-CIMGUI_API void ImGui_LabelTextUnformatted(const char* label, const char* text);                   // display text+label aligned the same way as value+label widgets
 CIMGUI_API void ImGui_LabelTextV(const char* label, const char* fmt, va_list args) IM_FMTLIST(2);
 CIMGUI_API void ImGui_BulletText(const char* fmt, ...) IM_FMTARGS(1);                              // shortcut for Bullet()+Text()
-CIMGUI_API void ImGui_BulletTextUnformatted(const char* text);                                     // shortcut for Bullet()+Text()
 CIMGUI_API void ImGui_BulletTextV(const char* fmt, va_list args) IM_FMTLIST(1);
 CIMGUI_API void ImGui_SeparatorText(const char* label);                                            // currently: formatted text with a horizontal line
 
@@ -830,16 +825,12 @@ CIMGUI_API void ImGui_SetColorEditOptions(ImGuiColorEditFlags flags);           
 // - TreeNode functions return true when the node is open, in which case you need to also call TreePop() when you are finished displaying the tree node contents.
 CIMGUI_API bool  ImGui_TreeNode(const char* label);
 CIMGUI_API bool  ImGui_TreeNodeStr(const char* str_id, const char* fmt, ...) IM_FMTARGS(2);                                        // helper variation to easily decorrelate the id from the displayed string. Read the FAQ about why and how to use ID. to align arbitrary text at the same level as a TreeNode() you can use Bullet().
-CIMGUI_API bool  ImGui_TreeNodeStrUnformatted(const char* str_id, const char* text);                                               // helper variation to easily decorrelate the id from the displayed string. Read the FAQ about why and how to use ID. to align arbitrary text at the same level as a TreeNode() you can use Bullet().
 CIMGUI_API bool  ImGui_TreeNodePtr(const void* ptr_id, const char* fmt, ...) IM_FMTARGS(2);                                        // "
-CIMGUI_API bool  ImGui_TreeNodePtrUnformatted(const void* ptr_id, const char* text);                                               // "
 CIMGUI_API bool  ImGui_TreeNodeV(const char* str_id, const char* fmt, va_list args) IM_FMTLIST(2);
 CIMGUI_API bool  ImGui_TreeNodeVPtr(const void* ptr_id, const char* fmt, va_list args) IM_FMTLIST(2);
 CIMGUI_API bool  ImGui_TreeNodeEx(const char* label, ImGuiTreeNodeFlags flags /* = 0 */);
 CIMGUI_API bool  ImGui_TreeNodeExStr(const char* str_id, ImGuiTreeNodeFlags flags, const char* fmt, ...) IM_FMTARGS(3);
-CIMGUI_API bool  ImGui_TreeNodeExStrUnformatted(const char* str_id, ImGuiTreeNodeFlags flags, const char* text);
 CIMGUI_API bool  ImGui_TreeNodeExPtr(const void* ptr_id, ImGuiTreeNodeFlags flags, const char* fmt, ...) IM_FMTARGS(3);
-CIMGUI_API bool  ImGui_TreeNodeExPtrUnformatted(const void* ptr_id, ImGuiTreeNodeFlags flags, const char* text);
 CIMGUI_API bool  ImGui_TreeNodeExV(const char* str_id, ImGuiTreeNodeFlags flags, const char* fmt, va_list args) IM_FMTLIST(3);
 CIMGUI_API bool  ImGui_TreeNodeExVPtr(const void* ptr_id, ImGuiTreeNodeFlags flags, const char* fmt, va_list args) IM_FMTLIST(3);
 CIMGUI_API void  ImGui_TreePush(const char* str_id);                                                                               // ~ Indent()+PushID(). Already called by TreeNode() when returning true, but you can call TreePush/TreePop yourself if desired.
@@ -919,7 +910,6 @@ CIMGUI_API bool ImGui_MenuItemBoolPtr(const char* label, const char* shortcut, b
 CIMGUI_API bool ImGui_BeginTooltip(void);                                        // begin/append a tooltip window.
 CIMGUI_API void ImGui_EndTooltip(void);                                          // only call EndTooltip() if BeginTooltip()/BeginItemTooltip() returns true!
 CIMGUI_API void ImGui_SetTooltip(const char* fmt, ...) IM_FMTARGS(1);            // set a text-only tooltip. Often used after a ImGui::IsItemHovered() check. Override any previous call to SetTooltip().
-CIMGUI_API void ImGui_SetTooltipUnformatted(const char* text);                   // set a text-only tooltip. Often used after a ImGui::IsItemHovered() check. Override any previous call to SetTooltip().
 CIMGUI_API void ImGui_SetTooltipV(const char* fmt, va_list args) IM_FMTLIST(1);
 
 // Tooltips: helpers for showing a tooltip when hovering an item
@@ -928,7 +918,6 @@ CIMGUI_API void ImGui_SetTooltipV(const char* fmt, va_list args) IM_FMTLIST(1);
 // - Where 'ImGuiHoveredFlags_ForTooltip' itself is a shortcut to use 'style.HoverFlagsForTooltipMouse' or 'style.HoverFlagsForTooltipNav' depending on active input type. For mouse it defaults to 'ImGuiHoveredFlags_Stationary | ImGuiHoveredFlags_DelayShort'.
 CIMGUI_API bool ImGui_BeginItemTooltip(void);                                        // begin/append a tooltip window if preceding item was hovered.
 CIMGUI_API void ImGui_SetItemTooltip(const char* fmt, ...) IM_FMTARGS(1);            // set a text-only tooltip if preceding item was hovered. override any previous call to SetTooltip().
-CIMGUI_API void ImGui_SetItemTooltipUnformatted(const char* text);                   // set a text-only tooltip if preceding item was hovered. override any previous call to SetTooltip().
 CIMGUI_API void ImGui_SetItemTooltipV(const char* fmt, va_list args) IM_FMTLIST(1);
 
 // Popups, Modals
@@ -1098,7 +1087,6 @@ CIMGUI_API void ImGui_LogToClipboard(int auto_open_depth /* = -1 */);           
 CIMGUI_API void ImGui_LogFinish(void);                                                               // stop logging (close file, etc.)
 CIMGUI_API void ImGui_LogButtons(void);                                                              // helper to display buttons for logging to tty/file/clipboard
 CIMGUI_API void ImGui_LogText(const char* fmt, ...) IM_FMTARGS(1);                                   // pass text data straight to log (without being displayed)
-CIMGUI_API void ImGui_LogTextUnformatted(const char* text);                                          // pass text data straight to log (without being displayed)
 CIMGUI_API void ImGui_LogTextV(const char* fmt, va_list args) IM_FMTLIST(1);
 
 // Drag and Drop
@@ -1286,7 +1274,6 @@ CIMGUI_API void  ImGui_DebugStartItemPicker(void);
 CIMGUI_API bool  ImGui_DebugCheckVersionAndDataLayout(const char* version_str, size_t sz_io, size_t sz_style, size_t sz_vec2, size_t sz_vec4, size_t sz_drawvert, size_t sz_drawidx); // This is called by IMGUI_CHECKVERSION() macro.
 #ifndef IMGUI_DISABLE_DEBUG_TOOLS
 CIMGUI_API void ImGui_DebugLog(const char* fmt, ...) IM_FMTARGS(1);            // Call via IMGUI_DEBUG_LOG() for maximum stripping in caller code!
-CIMGUI_API void ImGui_DebugLogUnformatted(const char* text);                   // Call via IMGUI_DEBUG_LOG() for maximum stripping in caller code!
 CIMGUI_API void ImGui_DebugLogV(const char* fmt, va_list args) IM_FMTLIST(1);
 #endif // #ifndef IMGUI_DISABLE_DEBUG_TOOLS
 // Memory Allocators

@@ -103,7 +103,7 @@ KeyCallback :: proc "c" (window: glfw.WindowHandle, keycode, scancode, action, m
 
 	imgui_key := KeyToImGuiKey(keycode, scancode)
 	imgui.GuiIO_AddKeyEvent(io, imgui_key, action == glfw.PRESS)
-	imgui.GuiIO_SetKeyEventNativeData(io, imgui_key, keycode, scancode, -1) // To support legacy indexing (<1.87 user code)
+	imgui.GuiIO_SetKeyEventNativeData(io, imgui_key, keycode, scancode) // To support legacy indexing (<1.87 user code)
 }
 
 WindowFocusCallback :: proc "c" (window: glfw.WindowHandle, focused: i32) {

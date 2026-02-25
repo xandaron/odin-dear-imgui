@@ -60,9 +60,9 @@ bit_setify = {
 
 rename = {
 	"ImGuiLastItemData_t.Rect" = "_Rect"
-	"ImGuiViewportP.DrawData" = "_DrawData"
-	"ImGuiContext.FontBaked" = "_FontBaked"
-	"ImGuiWindow.DrawList" = "_DrawList"
+	"ImGuiViewportP_t.DrawData" = "_DrawData"
+	"ImGuiContext_t.FontBaked" = "_FontBaked"
+	"ImGuiWindow_t.DrawList" = "_DrawList"
 
 	"ImGuiItemStatusFlags_" = "GuiItemStatusFlags"
 	"ImGuiSeparatorFlags_" = "GuiSeparatorFlags"
@@ -239,7 +239,7 @@ replace = {
 	"ImVector_ImFontAtlasRectEntry" = "Vector(FontAtlasRectEntry)"
 	"ImVector_stbrp_node_im" = "Vector(stbrp.Node)"
 
-	"Vector_ImU32" = "Vector(u32)"
+	"ImVector_ImU32" = "Vector(u32)"
 	"ImVector_ImVec2" = "Vector(Vec2)"
 	"ImVector_ImDrawListPtr" = "Vector(^DrawList)"
 	"ImVector_char" = "Vector(u8)"
