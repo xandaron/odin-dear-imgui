@@ -22,7 +22,7 @@ remove_type_suffix = "_t"
 
 force_ada_case_types = false
 
-imports_file = "import_dcimgui.odin"
+imports_file = "import_dcimgui.inc"
 
 package_name = "ImGui"
 
