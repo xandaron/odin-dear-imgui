@@ -295,7 +295,7 @@ GuiPopupFlags                   :: bit_set[GuiPopupFlag; i32]
 GUIPOPUPFLAGS_MOUSEBUTTONMIDDLE :: GuiPopupFlags {.MouseButtonLeft, .MouseButtonRight}
 GUIPOPUPFLAGS_ANYPOPUP          :: GuiPopupFlags {.AnyPopupId, .AnyPopupLevel}
 GUIPOPUPFLAGS_MOUSEBUTTONMASK_  :: GuiPopupFlags {.MouseButtonLeft, .MouseButtonRight}
-GUIPOPUPFLAGS_INVALIDMASK_      :: GuiPopupFlags {.MouseButtonShift_}
+GUIPOPUPFLAGS_INVALIDMASK_      :: transmute(GuiPopupFlags)i32(3)
 
 GuiSelectableFlag :: enum i32 {
 	NoAutoClosePopups = 0, // Clicking this doesn't close parent popup window (overrides ImGuiItemFlags_AutoClosePopups)
@@ -343,7 +343,7 @@ GuiTabBarFlag :: enum i32 {
 
 // Flags for ImGui::BeginTabBar()
 GuiTabBarFlags                    :: bit_set[GuiTabBarFlag; i32]
-GUITABBARFLAGS_FITTINGPOLICYMASK_ :: GuiTabBarFlags {.FittingPolicyMixed, .FittingPolicyShrink, .FittingPolicyScroll, .FittingPolicyDefault_}
+GUITABBARFLAGS_FITTINGPOLICYMASK_ :: transmute(GuiTabBarFlags)i32(896)
 
 GuiTabItemFlag :: enum i32 {
 	UnsavedDocument              = 0, // Display a dot next to the title + set ImGuiTabItemFlags_NoAssumedClosure.
@@ -937,7 +937,7 @@ GuiSliderFlag :: enum i32 {
 // (Those are per-item flags. There is shared behavior flag too: ImGuiIO: io.ConfigDragClickToInputText)
 GuiSliderFlags              :: bit_set[GuiSliderFlag; i32]
 GUISLIDERFLAGS_ALWAYSCLAMP  :: GuiSliderFlags {.ClampOnInput, .ClampZeroRange}
-GUISLIDERFLAGS_INVALIDMASK_ :: GuiSliderFlags {}
+GUISLIDERFLAGS_INVALIDMASK_ :: transmute(GuiSliderFlags)i32(1879048207)
 
 // Identify a mouse button.
 // Those values are guaranteed to be stable and we frequently use 0/1 directly. Named enums provided for convenience.
@@ -1944,9 +1944,9 @@ FontAtlasRect :: struct {
 }
 
 FontAtlasFlag :: enum i32 {
-	PowerOfTwoHeight = 0, // Don't round the height to next power of two
-	MouseCursors     = 1, // Don't build software mouse cursors into the atlas (save a little texture memory)
-	BakedLines       = 2, // Don't build thick line textures into the atlas (save a little texture memory, allow support for point/nearest filtering). The AntiAliasedLinesUseTex features uses them, otherwise they will be rendered using polygons (more expensive for CPU/GPU).
+	NoPowerOfTwoHeight = 0, // Don't round the height to next power of two
+	NoMouseCursors     = 1, // Don't build software mouse cursors into the atlas (save a little texture memory)
+	NoBakedLines       = 2, // Don't build thick line textures into the atlas (save a little texture memory, allow support for point/nearest filtering). The AntiAliasedLinesUseTex features uses them, otherwise they will be rendered using polygons (more expensive for CPU/GPU).
 }
 
 // Flags for ImFontAtlas build
@@ -2306,7 +2306,7 @@ foreign lib {
 	//    such as BeginMenu/EndMenu, BeginPopup/EndPopup, etc. where the EndXXX call should only be called if the corresponding
 	//    BeginXXX function returned true. Begin and BeginChild are the only odd ones out. Will be fixed in a future update.]
 	// - Note that the bottom of window stack always contains a window called "Debug".
-	Gui_Begin :: proc(name: cstring /* = NULL */, p_open: ^bool /* = NULL */, flags: GuiWindowFlags /* = 0 */) -> bool ---
+	Gui_Begin :: proc(name: cstring, p_open: ^bool /* = NULL */, flags: GuiWindowFlags /* = 0 */) -> bool ---
 	Gui_End   :: proc() ---
 
 	// Child Windows
@@ -2327,8 +2327,8 @@ foreign lib {
 	//   [Important: due to legacy reason, Begin/End and BeginChild/EndChild are inconsistent with all other functions
 	//    such as BeginMenu/EndMenu, BeginPopup/EndPopup, etc. where the EndXXX call should only be called if the corresponding
 	//    BeginXXX function returned true. Begin and BeginChild are the only odd ones out. Will be fixed in a future update.]
-	Gui_BeginChild   :: proc(str_id: cstring /* = ImVec2(0, 0) */, size: Vec2 /* = ImVec2(0, 0) */, child_flags: GuiChildFlags /* = 0 */, window_flags: GuiWindowFlags /* = 0 */) -> bool ---
-	Gui_BeginChildID :: proc(id: GuiID /* = ImVec2(0, 0) */, size: Vec2 /* = ImVec2(0, 0) */, child_flags: GuiChildFlags /* = 0 */, window_flags: GuiWindowFlags /* = 0 */) -> bool ---
+	Gui_BeginChild   :: proc(str_id: cstring, size: Vec2 /* = ImVec2(0, 0) */, child_flags: GuiChildFlags /* = 0 */, window_flags: GuiWindowFlags /* = 0 */) -> bool ---
+	Gui_BeginChildID :: proc(id: GuiID, size: Vec2 /* = ImVec2(0, 0) */, child_flags: GuiChildFlags /* = 0 */, window_flags: GuiWindowFlags /* = 0 */) -> bool ---
 	Gui_EndChild     :: proc() ---
 
 	// Windows Utilities
@@ -2347,38 +2347,38 @@ foreign lib {
 
 	// Window manipulation
 	// - Prefer using SetNextXXX functions (before Begin) rather that SetXXX functions (after Begin).
-	Gui_SetNextWindowPos             :: proc(pos: Vec2 /* = 0 */, cond: GuiCond /* = 0 */) --- // Implied pivot = ImVec2(0, 0)
-	Gui_SetNextWindowPosEx           :: proc(pos: Vec2 /* = 0 */, cond: GuiCond /* = 0 */, pivot: Vec2 /* = ImVec2(0, 0) */) --- // set next window position. call before Begin(). use pivot=(0.5f,0.5f) to center on given point, etc.
-	Gui_SetNextWindowSize            :: proc(size: Vec2 /* = 0 */, cond: GuiCond /* = 0 */) --- // set next window size. set axis to 0.0f to force an auto-fit on this axis. call before Begin()
-	Gui_SetNextWindowSizeConstraints :: proc(size_min: Vec2 /* = NULL */, size_max: Vec2 /* = NULL */, custom_callback: GuiSizeCallback /* = NULL */, custom_callback_data: rawptr /* = NULL */) --- // set next window size limits. use 0.0f or FLT_MAX if you don't want limits. Use -1 for both min and max of same axis to preserve current size (which itself is a constraint). Use callback to apply non-trivial programmatic constraints.
-	Gui_SetNextWindowContentSize     :: proc(size: Vec2) ---         // set next window content size (~ scrollable client area, which enforce the range of scrollbars). Not including window decorations (title bar, menu bar, etc.) nor WindowPadding. set an axis to 0.0f to leave it automatic. call before Begin()
-	Gui_SetNextWindowCollapsed       :: proc(collapsed: bool /* = 0 */, cond: GuiCond /* = 0 */) --- // set next window collapsed state. call before Begin()
-	Gui_SetNextWindowFocus           :: proc() ---                   // set next window to be focused / top-most. call before Begin()
-	Gui_SetNextWindowScroll          :: proc(scroll: Vec2) ---       // set next window scrolling value (use < 0.0f to not affect a given axis).
-	Gui_SetNextWindowBgAlpha         :: proc(alpha: f32) ---         // set next window background color alpha. helper to easily override the Alpha component of ImGuiCol_WindowBg/ChildBg/PopupBg. you may also use ImGuiWindowFlags_NoBackground.
-	Gui_SetNextWindowViewport        :: proc(viewport_id: GuiID) --- // set next window viewport
-	Gui_SetWindowPos                 :: proc(pos: Vec2 /* = 0 */, cond: GuiCond /* = 0 */) --- // (not recommended) set current window position - call within Begin()/End(). prefer using SetNextWindowPos(), as this may incur tearing and side-effects.
-	Gui_SetWindowSize                :: proc(size: Vec2 /* = 0 */, cond: GuiCond /* = 0 */) --- // (not recommended) set current window size - call within Begin()/End(). set to ImVec2(0, 0) to force an auto-fit. prefer using SetNextWindowSize(), as this may incur tearing and minor side-effects.
-	Gui_SetWindowCollapsed           :: proc(collapsed: bool /* = 0 */, cond: GuiCond /* = 0 */) --- // (not recommended) set current window collapsed state. prefer using SetNextWindowCollapsed().
-	Gui_SetWindowFocus               :: proc() ---                   // (not recommended) set current window to be focused / top-most. prefer using SetNextWindowFocus().
-	Gui_SetWindowPosStr              :: proc(name: cstring /* = 0 */, pos: Vec2 /* = 0 */, cond: GuiCond /* = 0 */) --- // set named window position.
-	Gui_SetWindowSizeStr             :: proc(name: cstring /* = 0 */, size: Vec2 /* = 0 */, cond: GuiCond /* = 0 */) --- // set named window size. set axis to 0.0f to force an auto-fit on this axis.
-	Gui_SetWindowCollapsedStr        :: proc(name: cstring /* = 0 */, collapsed: bool /* = 0 */, cond: GuiCond /* = 0 */) --- // set named window collapsed state
-	Gui_SetWindowFocusStr            :: proc(name: cstring) ---      // set named window to be focused / top-most. use NULL to remove focus.
+	Gui_SetNextWindowPos             :: proc(pos: Vec2, cond: GuiCond /* = 0 */) ---       // Implied pivot = ImVec2(0, 0)
+	Gui_SetNextWindowPosEx           :: proc(pos: Vec2, cond: GuiCond /* = 0 */, pivot: Vec2 /* = ImVec2(0, 0) */) --- // set next window position. call before Begin(). use pivot=(0.5f,0.5f) to center on given point, etc.
+	Gui_SetNextWindowSize            :: proc(size: Vec2, cond: GuiCond /* = 0 */) ---      // set next window size. set axis to 0.0f to force an auto-fit on this axis. call before Begin()
+	Gui_SetNextWindowSizeConstraints :: proc(size_min: Vec2, size_max: Vec2, custom_callback: GuiSizeCallback /* = NULL */, custom_callback_data: rawptr /* = NULL */) --- // set next window size limits. use 0.0f or FLT_MAX if you don't want limits. Use -1 for both min and max of same axis to preserve current size (which itself is a constraint). Use callback to apply non-trivial programmatic constraints.
+	Gui_SetNextWindowContentSize     :: proc(size: Vec2) ---                               // set next window content size (~ scrollable client area, which enforce the range of scrollbars). Not including window decorations (title bar, menu bar, etc.) nor WindowPadding. set an axis to 0.0f to leave it automatic. call before Begin()
+	Gui_SetNextWindowCollapsed       :: proc(collapsed: bool, cond: GuiCond /* = 0 */) --- // set next window collapsed state. call before Begin()
+	Gui_SetNextWindowFocus           :: proc() ---                                         // set next window to be focused / top-most. call before Begin()
+	Gui_SetNextWindowScroll          :: proc(scroll: Vec2) ---                             // set next window scrolling value (use < 0.0f to not affect a given axis).
+	Gui_SetNextWindowBgAlpha         :: proc(alpha: f32) ---                               // set next window background color alpha. helper to easily override the Alpha component of ImGuiCol_WindowBg/ChildBg/PopupBg. you may also use ImGuiWindowFlags_NoBackground.
+	Gui_SetNextWindowViewport        :: proc(viewport_id: GuiID) ---                       // set next window viewport
+	Gui_SetWindowPos                 :: proc(pos: Vec2, cond: GuiCond /* = 0 */) ---       // (not recommended) set current window position - call within Begin()/End(). prefer using SetNextWindowPos(), as this may incur tearing and side-effects.
+	Gui_SetWindowSize                :: proc(size: Vec2, cond: GuiCond /* = 0 */) ---      // (not recommended) set current window size - call within Begin()/End(). set to ImVec2(0, 0) to force an auto-fit. prefer using SetNextWindowSize(), as this may incur tearing and minor side-effects.
+	Gui_SetWindowCollapsed           :: proc(collapsed: bool, cond: GuiCond /* = 0 */) --- // (not recommended) set current window collapsed state. prefer using SetNextWindowCollapsed().
+	Gui_SetWindowFocus               :: proc() ---                                         // (not recommended) set current window to be focused / top-most. prefer using SetNextWindowFocus().
+	Gui_SetWindowPosStr              :: proc(name: cstring, pos: Vec2, cond: GuiCond /* = 0 */) --- // set named window position.
+	Gui_SetWindowSizeStr             :: proc(name: cstring, size: Vec2, cond: GuiCond /* = 0 */) --- // set named window size. set axis to 0.0f to force an auto-fit on this axis.
+	Gui_SetWindowCollapsedStr        :: proc(name: cstring, collapsed: bool, cond: GuiCond /* = 0 */) --- // set named window collapsed state
+	Gui_SetWindowFocusStr            :: proc(name: cstring) ---                            // set named window to be focused / top-most. use NULL to remove focus.
 
 	// Windows Scrolling
 	// - Any change of Scroll will be applied at the beginning of next frame in the first call to Begin().
 	// - You may instead use SetNextWindowScroll() prior to calling Begin() to avoid this delay, as an alternative to using SetScrollX()/SetScrollY().
-	Gui_GetScrollX        :: proc() -> f32 ---                          // get scrolling amount [0 .. GetScrollMaxX()]
-	Gui_GetScrollY        :: proc() -> f32 ---                          // get scrolling amount [0 .. GetScrollMaxY()]
-	Gui_SetScrollX        :: proc(scroll_x: f32) ---                    // set scrolling amount [0 .. GetScrollMaxX()]
-	Gui_SetScrollY        :: proc(scroll_y: f32) ---                    // set scrolling amount [0 .. GetScrollMaxY()]
-	Gui_GetScrollMaxX     :: proc() -> f32 ---                          // get maximum scrolling amount ~~ ContentSize.x - WindowSize.x - DecorationsSize.x
-	Gui_GetScrollMaxY     :: proc() -> f32 ---                          // get maximum scrolling amount ~~ ContentSize.y - WindowSize.y - DecorationsSize.y
-	Gui_SetScrollHereX    :: proc(center_x_ratio: f32 /* = 0.5f */) --- // adjust scrolling amount to make current cursor position visible. center_x_ratio=0.0: left, 0.5: center, 1.0: right. When using to make a "default/current item" visible, consider using SetItemDefaultFocus() instead.
-	Gui_SetScrollHereY    :: proc(center_y_ratio: f32 /* = 0.5f */) --- // adjust scrolling amount to make current cursor position visible. center_y_ratio=0.0: top, 0.5: center, 1.0: bottom. When using to make a "default/current item" visible, consider using SetItemDefaultFocus() instead.
-	Gui_SetScrollFromPosX :: proc(local_x: f32 /* = 0.5f */, center_x_ratio: f32 /* = 0.5f */) --- // adjust scrolling amount to make given position visible. Generally GetCursorStartPos() + offset to compute a valid position.
-	Gui_SetScrollFromPosY :: proc(local_y: f32 /* = 0.5f */, center_y_ratio: f32 /* = 0.5f */) --- // adjust scrolling amount to make given position visible. Generally GetCursorStartPos() + offset to compute a valid position.
+	Gui_GetScrollX        :: proc() -> f32 ---                                        // get scrolling amount [0 .. GetScrollMaxX()]
+	Gui_GetScrollY        :: proc() -> f32 ---                                        // get scrolling amount [0 .. GetScrollMaxY()]
+	Gui_SetScrollX        :: proc(scroll_x: f32) ---                                  // set scrolling amount [0 .. GetScrollMaxX()]
+	Gui_SetScrollY        :: proc(scroll_y: f32) ---                                  // set scrolling amount [0 .. GetScrollMaxY()]
+	Gui_GetScrollMaxX     :: proc() -> f32 ---                                        // get maximum scrolling amount ~~ ContentSize.x - WindowSize.x - DecorationsSize.x
+	Gui_GetScrollMaxY     :: proc() -> f32 ---                                        // get maximum scrolling amount ~~ ContentSize.y - WindowSize.y - DecorationsSize.y
+	Gui_SetScrollHereX    :: proc(center_x_ratio: f32 /* = 0.5f */) ---               // adjust scrolling amount to make current cursor position visible. center_x_ratio=0.0: left, 0.5: center, 1.0: right. When using to make a "default/current item" visible, consider using SetItemDefaultFocus() instead.
+	Gui_SetScrollHereY    :: proc(center_y_ratio: f32 /* = 0.5f */) ---               // adjust scrolling amount to make current cursor position visible. center_y_ratio=0.0: top, 0.5: center, 1.0: bottom. When using to make a "default/current item" visible, consider using SetItemDefaultFocus() instead.
+	Gui_SetScrollFromPosX :: proc(local_x: f32, center_x_ratio: f32 /* = 0.5f */) --- // adjust scrolling amount to make given position visible. Generally GetCursorStartPos() + offset to compute a valid position.
+	Gui_SetScrollFromPosY :: proc(local_y: f32, center_y_ratio: f32 /* = 0.5f */) --- // adjust scrolling amount to make given position visible. Generally GetCursorStartPos() + offset to compute a valid position.
 
 	// Parameters stacks (font)
 	//  - PushFont(font, 0.0f)                       // Change font and keep current size
@@ -2426,13 +2426,13 @@ foreign lib {
 
 	// Style read access
 	// - Use the ShowStyleEditor() function to interactively see/edit the colors.
-	Gui_GetFontTexUvWhitePixel :: proc() -> Vec2 ---             // get UV coordinate for a white pixel, useful to draw custom shapes via the ImDrawList API
-	Gui_GetColorU32            :: proc(idx: GuiCol) -> u32 ---   // Implied alpha_mul = 1.0f
-	Gui_GetColorU32Ex          :: proc(idx: GuiCol /* = 1.0f */, alpha_mul: f32 /* = 1.0f */) -> u32 --- // retrieve given style color with style alpha applied and optional extra alpha multiplier, packed as a 32-bit value suitable for ImDrawList
-	Gui_GetColorU32ImVec4      :: proc(col: Vec4) -> u32 ---     // retrieve given color with style alpha applied, packed as a 32-bit value suitable for ImDrawList
-	Gui_GetColorU32ImU32       :: proc(col: u32) -> u32 ---      // Implied alpha_mul = 1.0f
-	Gui_GetColorU32ImU32Ex     :: proc(col: u32 /* = 1.0f */, alpha_mul: f32 /* = 1.0f */) -> u32 --- // retrieve given color with style alpha applied, packed as a 32-bit value suitable for ImDrawList
-	Gui_GetStyleColorVec4      :: proc(idx: GuiCol) -> ^Vec4 --- // retrieve style color as stored in ImGuiStyle structure. use to feed back into PushStyleColor(), otherwise use GetColorU32() to get style color with style alpha baked in.
+	Gui_GetFontTexUvWhitePixel :: proc() -> Vec2 ---                                        // get UV coordinate for a white pixel, useful to draw custom shapes via the ImDrawList API
+	Gui_GetColorU32            :: proc(idx: GuiCol) -> u32 ---                              // Implied alpha_mul = 1.0f
+	Gui_GetColorU32Ex          :: proc(idx: GuiCol, alpha_mul: f32 /* = 1.0f */) -> u32 --- // retrieve given style color with style alpha applied and optional extra alpha multiplier, packed as a 32-bit value suitable for ImDrawList
+	Gui_GetColorU32ImVec4      :: proc(col: Vec4) -> u32 ---                                // retrieve given color with style alpha applied, packed as a 32-bit value suitable for ImDrawList
+	Gui_GetColorU32ImU32       :: proc(col: u32) -> u32 ---                                 // Implied alpha_mul = 1.0f
+	Gui_GetColorU32ImU32Ex     :: proc(col: u32, alpha_mul: f32 /* = 1.0f */) -> u32 ---    // retrieve given color with style alpha applied, packed as a 32-bit value suitable for ImDrawList
+	Gui_GetStyleColorVec4      :: proc(idx: GuiCol) -> ^Vec4 ---                            // retrieve style color as stored in ImGuiStyle structure. use to feed back into PushStyleColor(), otherwise use GetColorU32() to get style color with style alpha baked in.
 
 	// Layout cursor positioning
 	// - By "cursor" we mean the current output position.
@@ -2497,7 +2497,7 @@ foreign lib {
 
 	// Widgets: Text
 	Gui_TextUnformatted   :: proc(text: cstring) ---                                    // Implied text_end = NULL
-	Gui_TextUnformattedEx :: proc(text: cstring /* = NULL */, text_end: cstring /* = NULL */) --- // raw text without formatting. Roughly equivalent to Text("%s", text) but: A) doesn't require null terminated string if 'text_end' is specified, B) it's faster, no memory copy is done, no buffer size limits, recommended for long chunks of text.
+	Gui_TextUnformattedEx :: proc(text: cstring, text_end: cstring /* = NULL */) ---    // raw text without formatting. Roughly equivalent to Text("%s", text) but: A) doesn't require null terminated string if 'text_end' is specified, B) it's faster, no memory copy is done, no buffer size limits, recommended for long chunks of text.
 	Gui_Text              :: proc(fmt: cstring, #c_vararg _: ..any) ---                 // formatted text
 	Gui_TextV             :: proc(fmt: cstring, args: c.va_list) ---
 	Gui_TextColored       :: proc(col: Vec4, fmt: cstring, #c_vararg _: ..any) ---      // shortcut for PushStyleColor(ImGuiCol_Text, col); Text(fmt, ...); PopStyleColor();
@@ -2515,21 +2515,21 @@ foreign lib {
 	// Widgets: Main
 	// - Most widgets return true when the value has been changed or when pressed/selected
 	// - You may also use one of the many IsItemXXX functions (e.g. IsItemActive, IsItemHovered, etc.) to query widget state.
-	Gui_Button               :: proc(label: cstring) -> bool ---                         // Implied size = ImVec2(0, 0)
-	Gui_ButtonEx             :: proc(label: cstring /* = ImVec2(0, 0) */, size: Vec2 /* = ImVec2(0, 0) */) -> bool --- // button
-	Gui_SmallButton          :: proc(label: cstring) -> bool ---                         // button with (FramePadding.y == 0) to easily embed within text
-	Gui_InvisibleButton      :: proc(str_id: cstring /* = 0 */, size: Vec2 /* = 0 */, flags: GuiButtonFlags /* = 0 */) -> bool --- // flexible button behavior without the visuals, frequently useful to build custom behaviors using the public api (along with IsItemActive, IsItemHovered, etc.)
-	Gui_ArrowButton          :: proc(str_id: cstring, dir: GuiDir) -> bool ---           // square button with an arrow shape
+	Gui_Button               :: proc(label: cstring) -> bool ---                            // Implied size = ImVec2(0, 0)
+	Gui_ButtonEx             :: proc(label: cstring, size: Vec2 /* = ImVec2(0, 0) */) -> bool --- // button
+	Gui_SmallButton          :: proc(label: cstring) -> bool ---                            // button with (FramePadding.y == 0) to easily embed within text
+	Gui_InvisibleButton      :: proc(str_id: cstring, size: Vec2, flags: GuiButtonFlags /* = 0 */) -> bool --- // flexible button behavior without the visuals, frequently useful to build custom behaviors using the public api (along with IsItemActive, IsItemHovered, etc.)
+	Gui_ArrowButton          :: proc(str_id: cstring, dir: GuiDir) -> bool ---              // square button with an arrow shape
 	Gui_Checkbox             :: proc(label: cstring, v: ^bool) -> bool ---
 	Gui_CheckboxFlagsIntPtr  :: proc(label: cstring, flags: ^i32, flags_value: i32) -> bool ---
 	Gui_CheckboxFlagsUintPtr :: proc(label: cstring, flags: ^u32, flags_value: u32) -> bool ---
-	Gui_RadioButton          :: proc(label: cstring, active: bool) -> bool ---           // use with e.g. if (RadioButton("one", my_value==1)) { my_value = 1; }
-	Gui_RadioButtonIntPtr    :: proc(label: cstring, v: ^i32, v_button: i32) -> bool --- // shortcut to handle the above pattern when value is an integer
-	Gui_ProgressBar          :: proc(fraction: f32 /* = ImVec2(-FLT_MIN, 0) */, size_arg: Vec2 /* = ImVec2(-FLT_MIN, 0) */, overlay: cstring /* = NULL */) ---
-	Gui_Bullet               :: proc() ---                                               // draw a small circle + keep the cursor on the same line. advance cursor x position by GetTreeNodeToLabelSpacing(), same distance that TreeNode() uses
-	Gui_TextLink             :: proc(label: cstring) -> bool ---                         // hyperlink text button, return true when clicked
-	Gui_TextLinkOpenURL      :: proc(label: cstring) -> bool ---                         // Implied url = NULL
-	Gui_TextLinkOpenURLEx    :: proc(label: cstring /* = NULL */, url: cstring /* = NULL */) -> bool --- // hyperlink text button, automatically open file/url when clicked
+	Gui_RadioButton          :: proc(label: cstring, active: bool) -> bool ---              // use with e.g. if (RadioButton("one", my_value==1)) { my_value = 1; }
+	Gui_RadioButtonIntPtr    :: proc(label: cstring, v: ^i32, v_button: i32) -> bool ---    // shortcut to handle the above pattern when value is an integer
+	Gui_ProgressBar          :: proc(fraction: f32, size_arg: Vec2 /* = ImVec2(-FLT_MIN, 0) */, overlay: cstring /* = NULL */) ---
+	Gui_Bullet               :: proc() ---                                                  // draw a small circle + keep the cursor on the same line. advance cursor x position by GetTreeNodeToLabelSpacing(), same distance that TreeNode() uses
+	Gui_TextLink             :: proc(label: cstring) -> bool ---                            // hyperlink text button, return true when clicked
+	Gui_TextLinkOpenURL      :: proc(label: cstring) -> bool ---                            // Implied url = NULL
+	Gui_TextLinkOpenURLEx    :: proc(label: cstring, url: cstring /* = NULL */) -> bool --- // hyperlink text button, automatically open file/url when clicked
 
 	// Widgets: Images
 	// - Read about ImTextureID/ImTextureRef  here: https://github.com/ocornut/imgui/wiki/Image-Loading-and-Displaying-Examples
@@ -2538,23 +2538,23 @@ foreign lib {
 	// - ImageButton() draws a background based on regular Button() color + optionally an inner background if specified.
 	// - An obsolete version of Image(), before 1.91.9 (March 2025), had a 'tint_col' parameter which is now supported by the ImageWithBg() function.
 	Gui_Image         :: proc(tex_ref: TextureRef, image_size: Vec2) --- // Implied uv0 = ImVec2(0, 0), uv1 = ImVec2(1, 1)
-	Gui_ImageEx       :: proc(tex_ref: TextureRef /* = ImVec2(0, 0) */, image_size: Vec2 /* = ImVec2(0, 0) */, uv0: Vec2 /* = ImVec2(0, 0) */, uv1: Vec2 /* = ImVec2(1, 1) */) ---
+	Gui_ImageEx       :: proc(tex_ref: TextureRef, image_size: Vec2, uv0: Vec2 /* = ImVec2(0, 0) */, uv1: Vec2 /* = ImVec2(1, 1) */) ---
 	Gui_ImageWithBg   :: proc(tex_ref: TextureRef, image_size: Vec2) --- // Implied uv0 = ImVec2(0, 0), uv1 = ImVec2(1, 1), bg_col = ImVec4(0, 0, 0, 0), tint_col = ImVec4(1, 1, 1, 1)
-	Gui_ImageWithBgEx :: proc(tex_ref: TextureRef /* = ImVec2(0, 0) */, image_size: Vec2 /* = ImVec2(0, 0) */, uv0: Vec2 /* = ImVec2(0, 0) */, uv1: Vec2 /* = ImVec2(1, 1) */, bg_col: Vec4 /* = ImVec4(0, 0, 0, 0) */, tint_col: Vec4 /* = ImVec4(1, 1, 1, 1) */) ---
+	Gui_ImageWithBgEx :: proc(tex_ref: TextureRef, image_size: Vec2, uv0: Vec2 /* = ImVec2(0, 0) */, uv1: Vec2 /* = ImVec2(1, 1) */, bg_col: Vec4 /* = ImVec4(0, 0, 0, 0) */, tint_col: Vec4 /* = ImVec4(1, 1, 1, 1) */) ---
 	Gui_ImageButton   :: proc(str_id: cstring, tex_ref: TextureRef, image_size: Vec2) -> bool --- // Implied uv0 = ImVec2(0, 0), uv1 = ImVec2(1, 1), bg_col = ImVec4(0, 0, 0, 0), tint_col = ImVec4(1, 1, 1, 1)
-	Gui_ImageButtonEx :: proc(str_id: cstring /* = ImVec2(0, 0) */, tex_ref: TextureRef /* = ImVec2(0, 0) */, image_size: Vec2 /* = ImVec2(0, 0) */, uv0: Vec2 /* = ImVec2(0, 0) */, uv1: Vec2 /* = ImVec2(1, 1) */, bg_col: Vec4 /* = ImVec4(0, 0, 0, 0) */, tint_col: Vec4 /* = ImVec4(1, 1, 1, 1) */) -> bool ---
+	Gui_ImageButtonEx :: proc(str_id: cstring, tex_ref: TextureRef, image_size: Vec2, uv0: Vec2 /* = ImVec2(0, 0) */, uv1: Vec2 /* = ImVec2(1, 1) */, bg_col: Vec4 /* = ImVec4(0, 0, 0, 0) */, tint_col: Vec4 /* = ImVec4(1, 1, 1, 1) */) -> bool ---
 
 	// Widgets: Combo Box (Dropdown)
 	// - The BeginCombo()/EndCombo() api allows you to manage your contents and selection state however you want it, by creating e.g. Selectable() items.
 	// - The old Combo() api are helpers over BeginCombo()/EndCombo() which are kept available for convenience purpose. This is analogous to how ListBox are created.
-	Gui_BeginCombo      :: proc(label: cstring /* = 0 */, preview_value: cstring /* = 0 */, flags: GuiComboFlags /* = 0 */) -> bool ---
+	Gui_BeginCombo      :: proc(label: cstring, preview_value: cstring, flags: GuiComboFlags /* = 0 */) -> bool ---
 	Gui_EndCombo        :: proc() --- // only call EndCombo() if BeginCombo() returns true!
 	Gui_ComboChar       :: proc(label: cstring, current_item: ^i32, items: [^]cstring, items_count: i32) -> bool --- // Implied popup_max_height_in_items = -1
-	Gui_ComboCharEx     :: proc(label: cstring /* = -1 */, current_item: ^i32 /* = -1 */, items: [^]cstring /* = -1 */, items_count: i32 /* = -1 */, popup_max_height_in_items: i32 /* = -1 */) -> bool ---
+	Gui_ComboCharEx     :: proc(label: cstring, current_item: ^i32, items: [^]cstring, items_count: i32, popup_max_height_in_items: i32 /* = -1 */) -> bool ---
 	Gui_Combo           :: proc(label: cstring, current_item: ^i32, items_separated_by_zeros: cstring) -> bool --- // Implied popup_max_height_in_items = -1
-	Gui_ComboEx         :: proc(label: cstring /* = -1 */, current_item: ^i32 /* = -1 */, items_separated_by_zeros: cstring /* = -1 */, popup_max_height_in_items: i32 /* = -1 */) -> bool --- // Separate items with \0 within a string, end item-list with \0\0. e.g. "One\0Two\0Three\0"
+	Gui_ComboEx         :: proc(label: cstring, current_item: ^i32, items_separated_by_zeros: cstring, popup_max_height_in_items: i32 /* = -1 */) -> bool --- // Separate items with \0 within a string, end item-list with \0\0. e.g. "One\0Two\0Three\0"
 	Gui_ComboCallback   :: proc(label: cstring, current_item: ^i32, getter: proc "c" (user_data: rawptr, idx: i32) -> cstring, user_data: rawptr, items_count: i32) -> bool --- // Implied popup_max_height_in_items = -1
-	Gui_ComboCallbackEx :: proc(label: cstring /* = -1 */, current_item: ^i32 /* = -1 */, getter: proc "c" (user_data: rawptr /* = -1 */, idx: i32 /* = -1 */) -> cstring /* = -1 */, user_data: rawptr /* = -1 */, items_count: i32 /* = -1 */, popup_max_height_in_items: i32 /* = -1 */) -> bool ---
+	Gui_ComboCallbackEx :: proc(label: cstring, current_item: ^i32, getter: proc "c" (user_data: rawptr, idx: i32) -> cstring, user_data: rawptr, items_count: i32, popup_max_height_in_items: i32 /* = -1 */) -> bool ---
 
 	// Widgets: Drag Sliders
 	// - Ctrl+Click on any drag box to turn them into an input box. Manually input values aren't clamped by default and can go off-bounds. Use ImGuiSliderFlags_AlwaysClamp to always clamp.
@@ -2569,29 +2569,29 @@ foreign lib {
 	// - Legacy: Pre-1.78 there are DragXXX() function signatures that take a final `float power=1.0f' argument instead of the `ImGuiSliderFlags flags=0' argument.
 	//   If you get a warning converting a float to ImGuiSliderFlags, read https://github.com/ocornut/imgui/issues/3361
 	Gui_DragFloat         :: proc(label: cstring, v: ^f32) -> bool ---    // Implied v_speed = 1.0f, v_min = 0.0f, v_max = 0.0f, format = "%.3f", flags = 0
-	Gui_DragFloatEx       :: proc(label: cstring /* = 1.0f */, v: ^f32 /* = 1.0f */, v_speed: f32 /* = 1.0f */, v_min: f32 /* = 0.0f */, v_max: f32 /* = 0.0f */, format: cstring /* = "%.3f" */, flags: GuiSliderFlags /* = 0 */) -> bool --- // If v_min >= v_max we have no bound
+	Gui_DragFloatEx       :: proc(label: cstring, v: ^f32, v_speed: f32 /* = 1.0f */, v_min: f32 /* = 0.0f */, v_max: f32 /* = 0.0f */, format: cstring /* = "%.3f" */, flags: GuiSliderFlags /* = 0 */) -> bool --- // If v_min >= v_max we have no bound
 	Gui_DragFloat2        :: proc(label: cstring, v: ^[2]f32) -> bool --- // Implied v_speed = 1.0f, v_min = 0.0f, v_max = 0.0f, format = "%.3f", flags = 0
-	Gui_DragFloat2Ex      :: proc(label: cstring /* = 1.0f */, v: ^[2]f32 /* = 1.0f */, v_speed: f32 /* = 1.0f */, v_min: f32 /* = 0.0f */, v_max: f32 /* = 0.0f */, format: cstring /* = "%.3f" */, flags: GuiSliderFlags /* = 0 */) -> bool ---
+	Gui_DragFloat2Ex      :: proc(label: cstring, v: ^[2]f32, v_speed: f32 /* = 1.0f */, v_min: f32 /* = 0.0f */, v_max: f32 /* = 0.0f */, format: cstring /* = "%.3f" */, flags: GuiSliderFlags /* = 0 */) -> bool ---
 	Gui_DragFloat3        :: proc(label: cstring, v: ^[3]f32) -> bool --- // Implied v_speed = 1.0f, v_min = 0.0f, v_max = 0.0f, format = "%.3f", flags = 0
-	Gui_DragFloat3Ex      :: proc(label: cstring /* = 1.0f */, v: ^[3]f32 /* = 1.0f */, v_speed: f32 /* = 1.0f */, v_min: f32 /* = 0.0f */, v_max: f32 /* = 0.0f */, format: cstring /* = "%.3f" */, flags: GuiSliderFlags /* = 0 */) -> bool ---
+	Gui_DragFloat3Ex      :: proc(label: cstring, v: ^[3]f32, v_speed: f32 /* = 1.0f */, v_min: f32 /* = 0.0f */, v_max: f32 /* = 0.0f */, format: cstring /* = "%.3f" */, flags: GuiSliderFlags /* = 0 */) -> bool ---
 	Gui_DragFloat4        :: proc(label: cstring, v: ^[4]f32) -> bool --- // Implied v_speed = 1.0f, v_min = 0.0f, v_max = 0.0f, format = "%.3f", flags = 0
-	Gui_DragFloat4Ex      :: proc(label: cstring /* = 1.0f */, v: ^[4]f32 /* = 1.0f */, v_speed: f32 /* = 1.0f */, v_min: f32 /* = 0.0f */, v_max: f32 /* = 0.0f */, format: cstring /* = "%.3f" */, flags: GuiSliderFlags /* = 0 */) -> bool ---
+	Gui_DragFloat4Ex      :: proc(label: cstring, v: ^[4]f32, v_speed: f32 /* = 1.0f */, v_min: f32 /* = 0.0f */, v_max: f32 /* = 0.0f */, format: cstring /* = "%.3f" */, flags: GuiSliderFlags /* = 0 */) -> bool ---
 	Gui_DragFloatRange2   :: proc(label: cstring, v_current_min: ^f32, v_current_max: ^f32) -> bool --- // Implied v_speed = 1.0f, v_min = 0.0f, v_max = 0.0f, format = "%.3f", format_max = NULL, flags = 0
-	Gui_DragFloatRange2Ex :: proc(label: cstring /* = 1.0f */, v_current_min: ^f32 /* = 1.0f */, v_current_max: ^f32 /* = 1.0f */, v_speed: f32 /* = 1.0f */, v_min: f32 /* = 0.0f */, v_max: f32 /* = 0.0f */, format: cstring /* = "%.3f" */, format_max: cstring /* = NULL */, flags: GuiSliderFlags /* = 0 */) -> bool ---
+	Gui_DragFloatRange2Ex :: proc(label: cstring, v_current_min: ^f32, v_current_max: ^f32, v_speed: f32 /* = 1.0f */, v_min: f32 /* = 0.0f */, v_max: f32 /* = 0.0f */, format: cstring /* = "%.3f" */, format_max: cstring /* = NULL */, flags: GuiSliderFlags /* = 0 */) -> bool ---
 	Gui_DragInt           :: proc(label: cstring, v: ^i32) -> bool ---    // Implied v_speed = 1.0f, v_min = 0, v_max = 0, format = "%d", flags = 0
-	Gui_DragIntEx         :: proc(label: cstring /* = 1.0f */, v: ^i32 /* = 1.0f */, v_speed: f32 /* = 1.0f */, v_min: i32 /* = 0 */, v_max: i32 /* = 0 */, format: cstring /* = "%d" */, flags: GuiSliderFlags /* = 0 */) -> bool --- // If v_min >= v_max we have no bound
+	Gui_DragIntEx         :: proc(label: cstring, v: ^i32, v_speed: f32 /* = 1.0f */, v_min: i32 /* = 0 */, v_max: i32 /* = 0 */, format: cstring /* = "%d" */, flags: GuiSliderFlags /* = 0 */) -> bool --- // If v_min >= v_max we have no bound
 	Gui_DragInt2          :: proc(label: cstring, v: ^[2]i32) -> bool --- // Implied v_speed = 1.0f, v_min = 0, v_max = 0, format = "%d", flags = 0
-	Gui_DragInt2Ex        :: proc(label: cstring /* = 1.0f */, v: ^[2]i32 /* = 1.0f */, v_speed: f32 /* = 1.0f */, v_min: i32 /* = 0 */, v_max: i32 /* = 0 */, format: cstring /* = "%d" */, flags: GuiSliderFlags /* = 0 */) -> bool ---
+	Gui_DragInt2Ex        :: proc(label: cstring, v: ^[2]i32, v_speed: f32 /* = 1.0f */, v_min: i32 /* = 0 */, v_max: i32 /* = 0 */, format: cstring /* = "%d" */, flags: GuiSliderFlags /* = 0 */) -> bool ---
 	Gui_DragInt3          :: proc(label: cstring, v: ^[3]i32) -> bool --- // Implied v_speed = 1.0f, v_min = 0, v_max = 0, format = "%d", flags = 0
-	Gui_DragInt3Ex        :: proc(label: cstring /* = 1.0f */, v: ^[3]i32 /* = 1.0f */, v_speed: f32 /* = 1.0f */, v_min: i32 /* = 0 */, v_max: i32 /* = 0 */, format: cstring /* = "%d" */, flags: GuiSliderFlags /* = 0 */) -> bool ---
+	Gui_DragInt3Ex        :: proc(label: cstring, v: ^[3]i32, v_speed: f32 /* = 1.0f */, v_min: i32 /* = 0 */, v_max: i32 /* = 0 */, format: cstring /* = "%d" */, flags: GuiSliderFlags /* = 0 */) -> bool ---
 	Gui_DragInt4          :: proc(label: cstring, v: ^[4]i32) -> bool --- // Implied v_speed = 1.0f, v_min = 0, v_max = 0, format = "%d", flags = 0
-	Gui_DragInt4Ex        :: proc(label: cstring /* = 1.0f */, v: ^[4]i32 /* = 1.0f */, v_speed: f32 /* = 1.0f */, v_min: i32 /* = 0 */, v_max: i32 /* = 0 */, format: cstring /* = "%d" */, flags: GuiSliderFlags /* = 0 */) -> bool ---
+	Gui_DragInt4Ex        :: proc(label: cstring, v: ^[4]i32, v_speed: f32 /* = 1.0f */, v_min: i32 /* = 0 */, v_max: i32 /* = 0 */, format: cstring /* = "%d" */, flags: GuiSliderFlags /* = 0 */) -> bool ---
 	Gui_DragIntRange2     :: proc(label: cstring, v_current_min: ^i32, v_current_max: ^i32) -> bool --- // Implied v_speed = 1.0f, v_min = 0, v_max = 0, format = "%d", format_max = NULL, flags = 0
-	Gui_DragIntRange2Ex   :: proc(label: cstring /* = 1.0f */, v_current_min: ^i32 /* = 1.0f */, v_current_max: ^i32 /* = 1.0f */, v_speed: f32 /* = 1.0f */, v_min: i32 /* = 0 */, v_max: i32 /* = 0 */, format: cstring /* = "%d" */, format_max: cstring /* = NULL */, flags: GuiSliderFlags /* = 0 */) -> bool ---
+	Gui_DragIntRange2Ex   :: proc(label: cstring, v_current_min: ^i32, v_current_max: ^i32, v_speed: f32 /* = 1.0f */, v_min: i32 /* = 0 */, v_max: i32 /* = 0 */, format: cstring /* = "%d" */, format_max: cstring /* = NULL */, flags: GuiSliderFlags /* = 0 */) -> bool ---
 	Gui_DragScalar        :: proc(label: cstring, data_type: GuiDataType, p_data: rawptr) -> bool --- // Implied v_speed = 1.0f, p_min = NULL, p_max = NULL, format = NULL, flags = 0
-	Gui_DragScalarEx      :: proc(label: cstring /* = 1.0f */, data_type: GuiDataType /* = 1.0f */, p_data: rawptr /* = 1.0f */, v_speed: f32 /* = 1.0f */, p_min: rawptr /* = NULL */, p_max: rawptr /* = NULL */, format: cstring /* = NULL */, flags: GuiSliderFlags /* = 0 */) -> bool ---
+	Gui_DragScalarEx      :: proc(label: cstring, data_type: GuiDataType, p_data: rawptr, v_speed: f32 /* = 1.0f */, p_min: rawptr /* = NULL */, p_max: rawptr /* = NULL */, format: cstring /* = NULL */, flags: GuiSliderFlags /* = 0 */) -> bool ---
 	Gui_DragScalarN       :: proc(label: cstring, data_type: GuiDataType, p_data: rawptr, components: i32) -> bool --- // Implied v_speed = 1.0f, p_min = NULL, p_max = NULL, format = NULL, flags = 0
-	Gui_DragScalarNEx     :: proc(label: cstring /* = 1.0f */, data_type: GuiDataType /* = 1.0f */, p_data: rawptr /* = 1.0f */, components: i32 /* = 1.0f */, v_speed: f32 /* = 1.0f */, p_min: rawptr /* = NULL */, p_max: rawptr /* = NULL */, format: cstring /* = NULL */, flags: GuiSliderFlags /* = 0 */) -> bool ---
+	Gui_DragScalarNEx     :: proc(label: cstring, data_type: GuiDataType, p_data: rawptr, components: i32, v_speed: f32 /* = 1.0f */, p_min: rawptr /* = NULL */, p_max: rawptr /* = NULL */, format: cstring /* = NULL */, flags: GuiSliderFlags /* = 0 */) -> bool ---
 
 	// Widgets: Regular Sliders
 	// - Ctrl+Click on any slider to turn them into an input box. Manually input values aren't clamped by default and can go off-bounds. Use ImGuiSliderFlags_AlwaysClamp to always clamp.
@@ -2600,72 +2600,72 @@ foreign lib {
 	// - Legacy: Pre-1.78 there are SliderXXX() function signatures that take a final `float power=1.0f' argument instead of the `ImGuiSliderFlags flags=0' argument.
 	//   If you get a warning converting a float to ImGuiSliderFlags, read https://github.com/ocornut/imgui/issues/3361
 	Gui_SliderFloat     :: proc(label: cstring, v: ^f32, v_min: f32, v_max: f32) -> bool --- // Implied format = "%.3f", flags = 0
-	Gui_SliderFloatEx   :: proc(label: cstring /* = "%.3f" */, v: ^f32 /* = "%.3f" */, v_min: f32 /* = "%.3f" */, v_max: f32 /* = "%.3f" */, format: cstring /* = "%.3f" */, flags: GuiSliderFlags /* = 0 */) -> bool --- // adjust format to decorate the value with a prefix or a suffix for in-slider labels or unit display.
+	Gui_SliderFloatEx   :: proc(label: cstring, v: ^f32, v_min: f32, v_max: f32, format: cstring /* = "%.3f" */, flags: GuiSliderFlags /* = 0 */) -> bool --- // adjust format to decorate the value with a prefix or a suffix for in-slider labels or unit display.
 	Gui_SliderFloat2    :: proc(label: cstring, v: ^[2]f32, v_min: f32, v_max: f32) -> bool --- // Implied format = "%.3f", flags = 0
-	Gui_SliderFloat2Ex  :: proc(label: cstring /* = "%.3f" */, v: ^[2]f32 /* = "%.3f" */, v_min: f32 /* = "%.3f" */, v_max: f32 /* = "%.3f" */, format: cstring /* = "%.3f" */, flags: GuiSliderFlags /* = 0 */) -> bool ---
+	Gui_SliderFloat2Ex  :: proc(label: cstring, v: ^[2]f32, v_min: f32, v_max: f32, format: cstring /* = "%.3f" */, flags: GuiSliderFlags /* = 0 */) -> bool ---
 	Gui_SliderFloat3    :: proc(label: cstring, v: ^[3]f32, v_min: f32, v_max: f32) -> bool --- // Implied format = "%.3f", flags = 0
-	Gui_SliderFloat3Ex  :: proc(label: cstring /* = "%.3f" */, v: ^[3]f32 /* = "%.3f" */, v_min: f32 /* = "%.3f" */, v_max: f32 /* = "%.3f" */, format: cstring /* = "%.3f" */, flags: GuiSliderFlags /* = 0 */) -> bool ---
+	Gui_SliderFloat3Ex  :: proc(label: cstring, v: ^[3]f32, v_min: f32, v_max: f32, format: cstring /* = "%.3f" */, flags: GuiSliderFlags /* = 0 */) -> bool ---
 	Gui_SliderFloat4    :: proc(label: cstring, v: ^[4]f32, v_min: f32, v_max: f32) -> bool --- // Implied format = "%.3f", flags = 0
-	Gui_SliderFloat4Ex  :: proc(label: cstring /* = "%.3f" */, v: ^[4]f32 /* = "%.3f" */, v_min: f32 /* = "%.3f" */, v_max: f32 /* = "%.3f" */, format: cstring /* = "%.3f" */, flags: GuiSliderFlags /* = 0 */) -> bool ---
+	Gui_SliderFloat4Ex  :: proc(label: cstring, v: ^[4]f32, v_min: f32, v_max: f32, format: cstring /* = "%.3f" */, flags: GuiSliderFlags /* = 0 */) -> bool ---
 	Gui_SliderAngle     :: proc(label: cstring, v_rad: ^f32) -> bool ---                     // Implied v_degrees_min = -360.0f, v_degrees_max = +360.0f, format = "%.0f deg", flags = 0
-	Gui_SliderAngleEx   :: proc(label: cstring /* = -360.0f */, v_rad: ^f32 /* = -360.0f */, v_degrees_min: f32 /* = -360.0f */, v_degrees_max: f32 /* = +360.0f */, format: cstring /* = "%.0f deg" */, flags: GuiSliderFlags /* = 0 */) -> bool ---
+	Gui_SliderAngleEx   :: proc(label: cstring, v_rad: ^f32, v_degrees_min: f32 /* = -360.0f */, v_degrees_max: f32 /* = +360.0f */, format: cstring /* = "%.0f deg" */, flags: GuiSliderFlags /* = 0 */) -> bool ---
 	Gui_SliderInt       :: proc(label: cstring, v: ^i32, v_min: i32, v_max: i32) -> bool --- // Implied format = "%d", flags = 0
-	Gui_SliderIntEx     :: proc(label: cstring /* = "%d" */, v: ^i32 /* = "%d" */, v_min: i32 /* = "%d" */, v_max: i32 /* = "%d" */, format: cstring /* = "%d" */, flags: GuiSliderFlags /* = 0 */) -> bool ---
+	Gui_SliderIntEx     :: proc(label: cstring, v: ^i32, v_min: i32, v_max: i32, format: cstring /* = "%d" */, flags: GuiSliderFlags /* = 0 */) -> bool ---
 	Gui_SliderInt2      :: proc(label: cstring, v: ^[2]i32, v_min: i32, v_max: i32) -> bool --- // Implied format = "%d", flags = 0
-	Gui_SliderInt2Ex    :: proc(label: cstring /* = "%d" */, v: ^[2]i32 /* = "%d" */, v_min: i32 /* = "%d" */, v_max: i32 /* = "%d" */, format: cstring /* = "%d" */, flags: GuiSliderFlags /* = 0 */) -> bool ---
+	Gui_SliderInt2Ex    :: proc(label: cstring, v: ^[2]i32, v_min: i32, v_max: i32, format: cstring /* = "%d" */, flags: GuiSliderFlags /* = 0 */) -> bool ---
 	Gui_SliderInt3      :: proc(label: cstring, v: ^[3]i32, v_min: i32, v_max: i32) -> bool --- // Implied format = "%d", flags = 0
-	Gui_SliderInt3Ex    :: proc(label: cstring /* = "%d" */, v: ^[3]i32 /* = "%d" */, v_min: i32 /* = "%d" */, v_max: i32 /* = "%d" */, format: cstring /* = "%d" */, flags: GuiSliderFlags /* = 0 */) -> bool ---
+	Gui_SliderInt3Ex    :: proc(label: cstring, v: ^[3]i32, v_min: i32, v_max: i32, format: cstring /* = "%d" */, flags: GuiSliderFlags /* = 0 */) -> bool ---
 	Gui_SliderInt4      :: proc(label: cstring, v: ^[4]i32, v_min: i32, v_max: i32) -> bool --- // Implied format = "%d", flags = 0
-	Gui_SliderInt4Ex    :: proc(label: cstring /* = "%d" */, v: ^[4]i32 /* = "%d" */, v_min: i32 /* = "%d" */, v_max: i32 /* = "%d" */, format: cstring /* = "%d" */, flags: GuiSliderFlags /* = 0 */) -> bool ---
+	Gui_SliderInt4Ex    :: proc(label: cstring, v: ^[4]i32, v_min: i32, v_max: i32, format: cstring /* = "%d" */, flags: GuiSliderFlags /* = 0 */) -> bool ---
 	Gui_SliderScalar    :: proc(label: cstring, data_type: GuiDataType, p_data: rawptr, p_min: rawptr, p_max: rawptr) -> bool --- // Implied format = NULL, flags = 0
-	Gui_SliderScalarEx  :: proc(label: cstring /* = NULL */, data_type: GuiDataType /* = NULL */, p_data: rawptr /* = NULL */, p_min: rawptr /* = NULL */, p_max: rawptr /* = NULL */, format: cstring /* = NULL */, flags: GuiSliderFlags /* = 0 */) -> bool ---
+	Gui_SliderScalarEx  :: proc(label: cstring, data_type: GuiDataType, p_data: rawptr, p_min: rawptr, p_max: rawptr, format: cstring /* = NULL */, flags: GuiSliderFlags /* = 0 */) -> bool ---
 	Gui_SliderScalarN   :: proc(label: cstring, data_type: GuiDataType, p_data: rawptr, components: i32, p_min: rawptr, p_max: rawptr) -> bool --- // Implied format = NULL, flags = 0
-	Gui_SliderScalarNEx :: proc(label: cstring /* = NULL */, data_type: GuiDataType /* = NULL */, p_data: rawptr /* = NULL */, components: i32 /* = NULL */, p_min: rawptr /* = NULL */, p_max: rawptr /* = NULL */, format: cstring /* = NULL */, flags: GuiSliderFlags /* = 0 */) -> bool ---
+	Gui_SliderScalarNEx :: proc(label: cstring, data_type: GuiDataType, p_data: rawptr, components: i32, p_min: rawptr, p_max: rawptr, format: cstring /* = NULL */, flags: GuiSliderFlags /* = 0 */) -> bool ---
 	Gui_VSliderFloat    :: proc(label: cstring, size: Vec2, v: ^f32, v_min: f32, v_max: f32) -> bool --- // Implied format = "%.3f", flags = 0
-	Gui_VSliderFloatEx  :: proc(label: cstring /* = "%.3f" */, size: Vec2 /* = "%.3f" */, v: ^f32 /* = "%.3f" */, v_min: f32 /* = "%.3f" */, v_max: f32 /* = "%.3f" */, format: cstring /* = "%.3f" */, flags: GuiSliderFlags /* = 0 */) -> bool ---
+	Gui_VSliderFloatEx  :: proc(label: cstring, size: Vec2, v: ^f32, v_min: f32, v_max: f32, format: cstring /* = "%.3f" */, flags: GuiSliderFlags /* = 0 */) -> bool ---
 	Gui_VSliderInt      :: proc(label: cstring, size: Vec2, v: ^i32, v_min: i32, v_max: i32) -> bool --- // Implied format = "%d", flags = 0
-	Gui_VSliderIntEx    :: proc(label: cstring /* = "%d" */, size: Vec2 /* = "%d" */, v: ^i32 /* = "%d" */, v_min: i32 /* = "%d" */, v_max: i32 /* = "%d" */, format: cstring /* = "%d" */, flags: GuiSliderFlags /* = 0 */) -> bool ---
+	Gui_VSliderIntEx    :: proc(label: cstring, size: Vec2, v: ^i32, v_min: i32, v_max: i32, format: cstring /* = "%d" */, flags: GuiSliderFlags /* = 0 */) -> bool ---
 	Gui_VSliderScalar   :: proc(label: cstring, size: Vec2, data_type: GuiDataType, p_data: rawptr, p_min: rawptr, p_max: rawptr) -> bool --- // Implied format = NULL, flags = 0
-	Gui_VSliderScalarEx :: proc(label: cstring /* = NULL */, size: Vec2 /* = NULL */, data_type: GuiDataType /* = NULL */, p_data: rawptr /* = NULL */, p_min: rawptr /* = NULL */, p_max: rawptr /* = NULL */, format: cstring /* = NULL */, flags: GuiSliderFlags /* = 0 */) -> bool ---
+	Gui_VSliderScalarEx :: proc(label: cstring, size: Vec2, data_type: GuiDataType, p_data: rawptr, p_min: rawptr, p_max: rawptr, format: cstring /* = NULL */, flags: GuiSliderFlags /* = 0 */) -> bool ---
 
 	// Widgets: Input with Keyboard
 	// - If you want to use InputText() with std::string or any custom dynamic string type, use the wrapper in misc/cpp/imgui_stdlib.h/.cpp!
 	// - Most of the ImGuiInputTextFlags flags are only useful for InputText() and not for InputFloatX, InputIntX, InputDouble etc.
-	Gui_InputText            :: proc(label: cstring /* = 0 */, buf: cstring /* = 0 */, buf_size: c.size_t /* = 0 */, flags: GuiInputTextFlags /* = 0 */) -> bool --- // Implied callback = NULL, user_data = NULL
-	Gui_InputTextEx          :: proc(label: cstring /* = 0 */, buf: cstring /* = 0 */, buf_size: c.size_t /* = 0 */, flags: GuiInputTextFlags /* = 0 */, callback: GuiInputTextCallback /* = NULL */, user_data: rawptr /* = NULL */) -> bool ---
+	Gui_InputText            :: proc(label: cstring, buf: cstring, buf_size: c.size_t, flags: GuiInputTextFlags /* = 0 */) -> bool --- // Implied callback = NULL, user_data = NULL
+	Gui_InputTextEx          :: proc(label: cstring, buf: cstring, buf_size: c.size_t, flags: GuiInputTextFlags /* = 0 */, callback: GuiInputTextCallback /* = NULL */, user_data: rawptr /* = NULL */) -> bool ---
 	Gui_InputTextMultiline   :: proc(label: cstring, buf: cstring, buf_size: c.size_t) -> bool --- // Implied size = ImVec2(0, 0), flags = 0, callback = NULL, user_data = NULL
-	Gui_InputTextMultilineEx :: proc(label: cstring /* = ImVec2(0, 0) */, buf: cstring /* = ImVec2(0, 0) */, buf_size: c.size_t /* = ImVec2(0, 0) */, size: Vec2 /* = ImVec2(0, 0) */, flags: GuiInputTextFlags /* = 0 */, callback: GuiInputTextCallback /* = NULL */, user_data: rawptr /* = NULL */) -> bool ---
-	Gui_InputTextWithHint    :: proc(label: cstring /* = 0 */, hint: cstring /* = 0 */, buf: cstring /* = 0 */, buf_size: c.size_t /* = 0 */, flags: GuiInputTextFlags /* = 0 */) -> bool --- // Implied callback = NULL, user_data = NULL
-	Gui_InputTextWithHintEx  :: proc(label: cstring /* = 0 */, hint: cstring /* = 0 */, buf: cstring /* = 0 */, buf_size: c.size_t /* = 0 */, flags: GuiInputTextFlags /* = 0 */, callback: GuiInputTextCallback /* = NULL */, user_data: rawptr /* = NULL */) -> bool ---
+	Gui_InputTextMultilineEx :: proc(label: cstring, buf: cstring, buf_size: c.size_t, size: Vec2 /* = ImVec2(0, 0) */, flags: GuiInputTextFlags /* = 0 */, callback: GuiInputTextCallback /* = NULL */, user_data: rawptr /* = NULL */) -> bool ---
+	Gui_InputTextWithHint    :: proc(label: cstring, hint: cstring, buf: cstring, buf_size: c.size_t, flags: GuiInputTextFlags /* = 0 */) -> bool --- // Implied callback = NULL, user_data = NULL
+	Gui_InputTextWithHintEx  :: proc(label: cstring, hint: cstring, buf: cstring, buf_size: c.size_t, flags: GuiInputTextFlags /* = 0 */, callback: GuiInputTextCallback /* = NULL */, user_data: rawptr /* = NULL */) -> bool ---
 	Gui_InputFloat           :: proc(label: cstring, v: ^f32) -> bool ---    // Implied step = 0.0f, step_fast = 0.0f, format = "%.3f", flags = 0
-	Gui_InputFloatEx         :: proc(label: cstring /* = 0.0f */, v: ^f32 /* = 0.0f */, step: f32 /* = 0.0f */, step_fast: f32 /* = 0.0f */, format: cstring /* = "%.3f" */, flags: GuiInputTextFlags /* = 0 */) -> bool ---
+	Gui_InputFloatEx         :: proc(label: cstring, v: ^f32, step: f32 /* = 0.0f */, step_fast: f32 /* = 0.0f */, format: cstring /* = "%.3f" */, flags: GuiInputTextFlags /* = 0 */) -> bool ---
 	Gui_InputFloat2          :: proc(label: cstring, v: ^[2]f32) -> bool --- // Implied format = "%.3f", flags = 0
-	Gui_InputFloat2Ex        :: proc(label: cstring /* = "%.3f" */, v: ^[2]f32 /* = "%.3f" */, format: cstring /* = "%.3f" */, flags: GuiInputTextFlags /* = 0 */) -> bool ---
+	Gui_InputFloat2Ex        :: proc(label: cstring, v: ^[2]f32, format: cstring /* = "%.3f" */, flags: GuiInputTextFlags /* = 0 */) -> bool ---
 	Gui_InputFloat3          :: proc(label: cstring, v: ^[3]f32) -> bool --- // Implied format = "%.3f", flags = 0
-	Gui_InputFloat3Ex        :: proc(label: cstring /* = "%.3f" */, v: ^[3]f32 /* = "%.3f" */, format: cstring /* = "%.3f" */, flags: GuiInputTextFlags /* = 0 */) -> bool ---
+	Gui_InputFloat3Ex        :: proc(label: cstring, v: ^[3]f32, format: cstring /* = "%.3f" */, flags: GuiInputTextFlags /* = 0 */) -> bool ---
 	Gui_InputFloat4          :: proc(label: cstring, v: ^[4]f32) -> bool --- // Implied format = "%.3f", flags = 0
-	Gui_InputFloat4Ex        :: proc(label: cstring /* = "%.3f" */, v: ^[4]f32 /* = "%.3f" */, format: cstring /* = "%.3f" */, flags: GuiInputTextFlags /* = 0 */) -> bool ---
+	Gui_InputFloat4Ex        :: proc(label: cstring, v: ^[4]f32, format: cstring /* = "%.3f" */, flags: GuiInputTextFlags /* = 0 */) -> bool ---
 	Gui_InputInt             :: proc(label: cstring, v: ^i32) -> bool ---    // Implied step = 1, step_fast = 100, flags = 0
-	Gui_InputIntEx           :: proc(label: cstring /* = 1 */, v: ^i32 /* = 1 */, step: i32 /* = 1 */, step_fast: i32 /* = 100 */, flags: GuiInputTextFlags /* = 0 */) -> bool ---
-	Gui_InputInt2            :: proc(label: cstring /* = 0 */, v: ^[2]i32 /* = 0 */, flags: GuiInputTextFlags /* = 0 */) -> bool ---
-	Gui_InputInt3            :: proc(label: cstring /* = 0 */, v: ^[3]i32 /* = 0 */, flags: GuiInputTextFlags /* = 0 */) -> bool ---
-	Gui_InputInt4            :: proc(label: cstring /* = 0 */, v: ^[4]i32 /* = 0 */, flags: GuiInputTextFlags /* = 0 */) -> bool ---
+	Gui_InputIntEx           :: proc(label: cstring, v: ^i32, step: i32 /* = 1 */, step_fast: i32 /* = 100 */, flags: GuiInputTextFlags /* = 0 */) -> bool ---
+	Gui_InputInt2            :: proc(label: cstring, v: ^[2]i32, flags: GuiInputTextFlags /* = 0 */) -> bool ---
+	Gui_InputInt3            :: proc(label: cstring, v: ^[3]i32, flags: GuiInputTextFlags /* = 0 */) -> bool ---
+	Gui_InputInt4            :: proc(label: cstring, v: ^[4]i32, flags: GuiInputTextFlags /* = 0 */) -> bool ---
 	Gui_InputDouble          :: proc(label: cstring, v: ^f64) -> bool ---    // Implied step = 0.0, step_fast = 0.0, format = "%.6f", flags = 0
-	Gui_InputDoubleEx        :: proc(label: cstring /* = 0.0 */, v: ^f64 /* = 0.0 */, step: f64 /* = 0.0 */, step_fast: f64 /* = 0.0 */, format: cstring /* = "%.6f" */, flags: GuiInputTextFlags /* = 0 */) -> bool ---
+	Gui_InputDoubleEx        :: proc(label: cstring, v: ^f64, step: f64 /* = 0.0 */, step_fast: f64 /* = 0.0 */, format: cstring /* = "%.6f" */, flags: GuiInputTextFlags /* = 0 */) -> bool ---
 	Gui_InputScalar          :: proc(label: cstring, data_type: GuiDataType, p_data: rawptr) -> bool --- // Implied p_step = NULL, p_step_fast = NULL, format = NULL, flags = 0
-	Gui_InputScalarEx        :: proc(label: cstring /* = NULL */, data_type: GuiDataType /* = NULL */, p_data: rawptr /* = NULL */, p_step: rawptr /* = NULL */, p_step_fast: rawptr /* = NULL */, format: cstring /* = NULL */, flags: GuiInputTextFlags /* = 0 */) -> bool ---
+	Gui_InputScalarEx        :: proc(label: cstring, data_type: GuiDataType, p_data: rawptr, p_step: rawptr /* = NULL */, p_step_fast: rawptr /* = NULL */, format: cstring /* = NULL */, flags: GuiInputTextFlags /* = 0 */) -> bool ---
 	Gui_InputScalarN         :: proc(label: cstring, data_type: GuiDataType, p_data: rawptr, components: i32) -> bool --- // Implied p_step = NULL, p_step_fast = NULL, format = NULL, flags = 0
-	Gui_InputScalarNEx       :: proc(label: cstring /* = NULL */, data_type: GuiDataType /* = NULL */, p_data: rawptr /* = NULL */, components: i32 /* = NULL */, p_step: rawptr /* = NULL */, p_step_fast: rawptr /* = NULL */, format: cstring /* = NULL */, flags: GuiInputTextFlags /* = 0 */) -> bool ---
+	Gui_InputScalarNEx       :: proc(label: cstring, data_type: GuiDataType, p_data: rawptr, components: i32, p_step: rawptr /* = NULL */, p_step_fast: rawptr /* = NULL */, format: cstring /* = NULL */, flags: GuiInputTextFlags /* = 0 */) -> bool ---
 
 	// Widgets: Color Editor/Picker (tip: the ColorEdit* functions have a little color square that can be left-clicked to open a picker, and right-clicked to open an option menu.)
 	// - Note that in C++ a 'float v[X]' function argument is the _same_ as 'float* v', the array syntax is just a way to document the number of elements that are expected to be accessible.
 	// - You can pass the address of a first float element out of a contiguous structure, e.g. &myvector.x
-	Gui_ColorEdit3          :: proc(label: cstring /* = 0 */, col: ^[3]f32 /* = 0 */, flags: GuiColorEditFlags /* = 0 */) -> bool ---
-	Gui_ColorEdit4          :: proc(label: cstring /* = 0 */, col: ^[4]f32 /* = 0 */, flags: GuiColorEditFlags /* = 0 */) -> bool ---
-	Gui_ColorPicker3        :: proc(label: cstring /* = 0 */, col: ^[3]f32 /* = 0 */, flags: GuiColorEditFlags /* = 0 */) -> bool ---
-	Gui_ColorPicker4        :: proc(label: cstring /* = 0 */, col: ^[4]f32 /* = 0 */, flags: GuiColorEditFlags /* = 0 */, ref_col: ^f32 /* = NULL */) -> bool ---
-	Gui_ColorButton         :: proc(desc_id: cstring /* = 0 */, col: Vec4 /* = 0 */, flags: GuiColorEditFlags /* = 0 */) -> bool --- // Implied size = ImVec2(0, 0)
-	Gui_ColorButtonEx       :: proc(desc_id: cstring /* = 0 */, col: Vec4 /* = 0 */, flags: GuiColorEditFlags /* = 0 */, size: Vec2 /* = ImVec2(0, 0) */) -> bool --- // display a color square/button, hover for details, return true when pressed.
+	Gui_ColorEdit3          :: proc(label: cstring, col: ^[3]f32, flags: GuiColorEditFlags /* = 0 */) -> bool ---
+	Gui_ColorEdit4          :: proc(label: cstring, col: ^[4]f32, flags: GuiColorEditFlags /* = 0 */) -> bool ---
+	Gui_ColorPicker3        :: proc(label: cstring, col: ^[3]f32, flags: GuiColorEditFlags /* = 0 */) -> bool ---
+	Gui_ColorPicker4        :: proc(label: cstring, col: ^[4]f32, flags: GuiColorEditFlags /* = 0 */, ref_col: ^f32 /* = NULL */) -> bool ---
+	Gui_ColorButton         :: proc(desc_id: cstring, col: Vec4, flags: GuiColorEditFlags /* = 0 */) -> bool --- // Implied size = ImVec2(0, 0)
+	Gui_ColorButtonEx       :: proc(desc_id: cstring, col: Vec4, flags: GuiColorEditFlags /* = 0 */, size: Vec2 /* = ImVec2(0, 0) */) -> bool --- // display a color square/button, hover for details, return true when pressed.
 	Gui_SetColorEditOptions :: proc(flags: GuiColorEditFlags) --- // initialize current options (generally on application startup) if you want to select a default format, picker type, etc. User will be able to change many settings, unless you pass the _NoOptions flag to your calls.
 
 	// Widgets: Trees
@@ -2675,27 +2675,27 @@ foreign lib {
 	Gui_TreeNodePtr               :: proc(ptr_id: rawptr, fmt: cstring, #c_vararg _: ..any) -> bool --- // "
 	Gui_TreeNodeV                 :: proc(str_id: cstring, fmt: cstring, args: c.va_list) -> bool ---
 	Gui_TreeNodeVPtr              :: proc(ptr_id: rawptr, fmt: cstring, args: c.va_list) -> bool ---
-	Gui_TreeNodeEx                :: proc(label: cstring /* = 0 */, flags: GuiTreeNodeFlags /* = 0 */) -> bool ---
+	Gui_TreeNodeEx                :: proc(label: cstring, flags: GuiTreeNodeFlags /* = 0 */) -> bool ---
 	Gui_TreeNodeExStr             :: proc(str_id: cstring, flags: GuiTreeNodeFlags, fmt: cstring, #c_vararg _: ..any) -> bool ---
 	Gui_TreeNodeExPtr             :: proc(ptr_id: rawptr, flags: GuiTreeNodeFlags, fmt: cstring, #c_vararg _: ..any) -> bool ---
 	Gui_TreeNodeExV               :: proc(str_id: cstring, flags: GuiTreeNodeFlags, fmt: cstring, args: c.va_list) -> bool ---
 	Gui_TreeNodeExVPtr            :: proc(ptr_id: rawptr, flags: GuiTreeNodeFlags, fmt: cstring, args: c.va_list) -> bool ---
-	Gui_TreePush                  :: proc(str_id: cstring) ---   // ~ Indent()+PushID(). Already called by TreeNode() when returning true, but you can call TreePush/TreePop yourself if desired.
-	Gui_TreePushPtr               :: proc(ptr_id: rawptr) ---    // "
-	Gui_TreePop                   :: proc() ---                  // ~ Unindent()+PopID()
-	Gui_GetTreeNodeToLabelSpacing :: proc() -> f32 ---           // horizontal distance preceding label when using TreeNode*() or Bullet() == (g.FontSize + style.FramePadding.x*2) for a regular unframed TreeNode
-	Gui_CollapsingHeader          :: proc(label: cstring /* = 0 */, flags: GuiTreeNodeFlags /* = 0 */) -> bool --- // if returning 'true' the header is open. doesn't indent nor push on ID stack. user doesn't have to call TreePop().
-	Gui_CollapsingHeaderBoolPtr   :: proc(label: cstring /* = 0 */, p_visible: ^bool /* = 0 */, flags: GuiTreeNodeFlags /* = 0 */) -> bool --- // when 'p_visible != NULL': if '*p_visible==true' display an additional small close button on upper right of the header which will set the bool to false when clicked, if '*p_visible==false' don't display the header.
-	Gui_SetNextItemOpen           :: proc(is_open: bool /* = 0 */, cond: GuiCond /* = 0 */) --- // set next TreeNode/CollapsingHeader open state.
-	Gui_SetNextItemStorageID      :: proc(storage_id: GuiID) --- // set id to use for open/close storage (default to same as item id).
+	Gui_TreePush                  :: proc(str_id: cstring) ---                        // ~ Indent()+PushID(). Already called by TreeNode() when returning true, but you can call TreePush/TreePop yourself if desired.
+	Gui_TreePushPtr               :: proc(ptr_id: rawptr) ---                         // "
+	Gui_TreePop                   :: proc() ---                                       // ~ Unindent()+PopID()
+	Gui_GetTreeNodeToLabelSpacing :: proc() -> f32 ---                                // horizontal distance preceding label when using TreeNode*() or Bullet() == (g.FontSize + style.FramePadding.x*2) for a regular unframed TreeNode
+	Gui_CollapsingHeader          :: proc(label: cstring, flags: GuiTreeNodeFlags /* = 0 */) -> bool --- // if returning 'true' the header is open. doesn't indent nor push on ID stack. user doesn't have to call TreePop().
+	Gui_CollapsingHeaderBoolPtr   :: proc(label: cstring, p_visible: ^bool, flags: GuiTreeNodeFlags /* = 0 */) -> bool --- // when 'p_visible != NULL': if '*p_visible==true' display an additional small close button on upper right of the header which will set the bool to false when clicked, if '*p_visible==false' don't display the header.
+	Gui_SetNextItemOpen           :: proc(is_open: bool, cond: GuiCond /* = 0 */) --- // set next TreeNode/CollapsingHeader open state.
+	Gui_SetNextItemStorageID      :: proc(storage_id: GuiID) ---                      // set id to use for open/close storage (default to same as item id).
 
 	// Widgets: Selectables
 	// - A selectable highlights when hovered, and can display another color when selected.
 	// - Neighbors selectable extend their highlight bounds in order to leave no gap between them. This is so a series of selected Selectable appear contiguous.
 	Gui_Selectable          :: proc(label: cstring) -> bool --- // Implied selected = false, flags = 0, size = ImVec2(0, 0)
-	Gui_SelectableEx        :: proc(label: cstring /* = false */, selected: bool /* = false */, flags: GuiSelectableFlags /* = 0 */, size: Vec2 /* = ImVec2(0, 0) */) -> bool --- // "bool selected" carry the selection state (read-only). Selectable() is clicked is returns true so you can modify your selection state. size.x==0.0: use remaining width, size.x>0.0: specify width. size.y==0.0: use label height, size.y>0.0: specify height
-	Gui_SelectableBoolPtr   :: proc(label: cstring /* = 0 */, p_selected: ^bool /* = 0 */, flags: GuiSelectableFlags /* = 0 */) -> bool --- // Implied size = ImVec2(0, 0)
-	Gui_SelectableBoolPtrEx :: proc(label: cstring /* = 0 */, p_selected: ^bool /* = 0 */, flags: GuiSelectableFlags /* = 0 */, size: Vec2 /* = ImVec2(0, 0) */) -> bool --- // "bool* p_selected" point to the selection state (read-write), as a convenient helper.
+	Gui_SelectableEx        :: proc(label: cstring, selected: bool /* = false */, flags: GuiSelectableFlags /* = 0 */, size: Vec2 /* = ImVec2(0, 0) */) -> bool --- // "bool selected" carry the selection state (read-only). Selectable() is clicked is returns true so you can modify your selection state. size.x==0.0: use remaining width, size.x>0.0: specify width. size.y==0.0: use label height, size.y>0.0: specify height
+	Gui_SelectableBoolPtr   :: proc(label: cstring, p_selected: ^bool, flags: GuiSelectableFlags /* = 0 */) -> bool --- // Implied size = ImVec2(0, 0)
+	Gui_SelectableBoolPtrEx :: proc(label: cstring, p_selected: ^bool, flags: GuiSelectableFlags /* = 0 */, size: Vec2 /* = ImVec2(0, 0) */) -> bool --- // "bool* p_selected" point to the selection state (read-write), as a convenient helper.
 
 	// Multi-selection system for Selectable(), Checkbox(), TreeNode() functions [BETA]
 	// - This enables standard multi-selection/range-selection idioms (Ctrl+Mouse/Keyboard, Shift+Mouse/Keyboard, etc.) in a way that also allow a clipper to be used.
@@ -2705,7 +2705,7 @@ foreign lib {
 	//   which is suited to advanced trees setups already implementing filters and clipper. We will work simplifying the current demo.
 	// - 'selection_size' and 'items_count' parameters are optional and used by a few features. If they are costly for you to compute, you may avoid them.
 	Gui_BeginMultiSelect             :: proc(flags: GuiMultiSelectFlags) -> ^GuiMultiSelectIO --- // Implied selection_size = -1, items_count = -1
-	Gui_BeginMultiSelectEx           :: proc(flags: GuiMultiSelectFlags /* = -1 */, selection_size: i32 /* = -1 */, items_count: i32 /* = -1 */) -> ^GuiMultiSelectIO ---
+	Gui_BeginMultiSelectEx           :: proc(flags: GuiMultiSelectFlags, selection_size: i32 /* = -1 */, items_count: i32 /* = -1 */) -> ^GuiMultiSelectIO ---
 	Gui_EndMultiSelect               :: proc() -> ^GuiMultiSelectIO ---
 	Gui_SetNextItemSelectionUserData :: proc(selection_user_data: GuiSelectionUserData) ---
 	Gui_IsItemToggledSelection       :: proc() -> bool --- // Was the last item selection state toggled? Useful if you need the per-item information _before_ reaching EndMultiSelect(). We only returns toggle _event_ in order to handle clipping correctly.
@@ -2717,38 +2717,38 @@ foreign lib {
 	// - The simplified/old ListBox() api are helpers over BeginListBox()/EndListBox() which are kept available for convenience purpose. This is analogous to how Combos are created.
 	// - Choose frame width:   size.x > 0.0f: custom  /  size.x < 0.0f or -FLT_MIN: right-align   /  size.x = 0.0f (default): use current ItemWidth
 	// - Choose frame height:  size.y > 0.0f: custom  /  size.y < 0.0f or -FLT_MIN: bottom-align  /  size.y = 0.0f (default): arbitrary default height which can fit ~7 items
-	Gui_BeginListBox      :: proc(label: cstring /* = ImVec2(0, 0) */, size: Vec2 /* = ImVec2(0, 0) */) -> bool --- // open a framed scrolling region
+	Gui_BeginListBox      :: proc(label: cstring, size: Vec2 /* = ImVec2(0, 0) */) -> bool --- // open a framed scrolling region
 	Gui_EndListBox        :: proc() --- // only call EndListBox() if BeginListBox() returned true!
-	Gui_ListBox           :: proc(label: cstring /* = -1 */, current_item: ^i32 /* = -1 */, items: [^]cstring /* = -1 */, items_count: i32 /* = -1 */, height_in_items: i32 /* = -1 */) -> bool ---
+	Gui_ListBox           :: proc(label: cstring, current_item: ^i32, items: [^]cstring, items_count: i32, height_in_items: i32 /* = -1 */) -> bool ---
 	Gui_ListBoxCallback   :: proc(label: cstring, current_item: ^i32, getter: proc "c" (user_data: rawptr, idx: i32) -> cstring, user_data: rawptr, items_count: i32) -> bool --- // Implied height_in_items = -1
-	Gui_ListBoxCallbackEx :: proc(label: cstring /* = -1 */, current_item: ^i32 /* = -1 */, getter: proc "c" (user_data: rawptr /* = -1 */, idx: i32 /* = -1 */) -> cstring /* = -1 */, user_data: rawptr /* = -1 */, items_count: i32 /* = -1 */, height_in_items: i32 /* = -1 */) -> bool ---
+	Gui_ListBoxCallbackEx :: proc(label: cstring, current_item: ^i32, getter: proc "c" (user_data: rawptr, idx: i32) -> cstring, user_data: rawptr, items_count: i32, height_in_items: i32 /* = -1 */) -> bool ---
 
 	// Widgets: Data Plotting
 	// - Consider using ImPlot (https://github.com/epezent/implot) which is much better!
 	Gui_PlotLines               :: proc(label: cstring, values: ^f32, values_count: i32) --- // Implied values_offset = 0, overlay_text = NULL, scale_min = FLT_MAX, scale_max = FLT_MAX, graph_size = ImVec2(0, 0), stride = sizeof(float)
-	Gui_PlotLinesEx             :: proc(label: cstring /* = 0 */, values: ^f32 /* = 0 */, values_count: i32 /* = 0 */, values_offset: i32 /* = 0 */, overlay_text: cstring /* = NULL */, scale_min: f32 /* = FLT_MAX */, scale_max: f32 /* = FLT_MAX */, graph_size: Vec2 /* = ImVec2(0, 0) */, stride: i32 /* = sizeof(float) */) ---
+	Gui_PlotLinesEx             :: proc(label: cstring, values: ^f32, values_count: i32, values_offset: i32 /* = 0 */, overlay_text: cstring /* = NULL */, scale_min: f32 /* = FLT_MAX */, scale_max: f32 /* = FLT_MAX */, graph_size: Vec2 /* = ImVec2(0, 0) */, stride: i32 /* = sizeof(float) */) ---
 	Gui_PlotLinesCallback       :: proc(label: cstring, values_getter: proc "c" (data: rawptr, idx: i32) -> f32, data: rawptr, values_count: i32) --- // Implied values_offset = 0, overlay_text = NULL, scale_min = FLT_MAX, scale_max = FLT_MAX, graph_size = ImVec2(0, 0)
-	Gui_PlotLinesCallbackEx     :: proc(label: cstring /* = 0 */, values_getter: proc "c" (data: rawptr /* = 0 */, idx: i32 /* = 0 */) -> f32 /* = 0 */, data: rawptr /* = 0 */, values_count: i32 /* = 0 */, values_offset: i32 /* = 0 */, overlay_text: cstring /* = NULL */, scale_min: f32 /* = FLT_MAX */, scale_max: f32 /* = FLT_MAX */, graph_size: Vec2 /* = ImVec2(0, 0) */) ---
+	Gui_PlotLinesCallbackEx     :: proc(label: cstring, values_getter: proc "c" (data: rawptr, idx: i32) -> f32, data: rawptr, values_count: i32, values_offset: i32 /* = 0 */, overlay_text: cstring /* = NULL */, scale_min: f32 /* = FLT_MAX */, scale_max: f32 /* = FLT_MAX */, graph_size: Vec2 /* = ImVec2(0, 0) */) ---
 	Gui_PlotHistogram           :: proc(label: cstring, values: ^f32, values_count: i32) --- // Implied values_offset = 0, overlay_text = NULL, scale_min = FLT_MAX, scale_max = FLT_MAX, graph_size = ImVec2(0, 0), stride = sizeof(float)
-	Gui_PlotHistogramEx         :: proc(label: cstring /* = 0 */, values: ^f32 /* = 0 */, values_count: i32 /* = 0 */, values_offset: i32 /* = 0 */, overlay_text: cstring /* = NULL */, scale_min: f32 /* = FLT_MAX */, scale_max: f32 /* = FLT_MAX */, graph_size: Vec2 /* = ImVec2(0, 0) */, stride: i32 /* = sizeof(float) */) ---
+	Gui_PlotHistogramEx         :: proc(label: cstring, values: ^f32, values_count: i32, values_offset: i32 /* = 0 */, overlay_text: cstring /* = NULL */, scale_min: f32 /* = FLT_MAX */, scale_max: f32 /* = FLT_MAX */, graph_size: Vec2 /* = ImVec2(0, 0) */, stride: i32 /* = sizeof(float) */) ---
 	Gui_PlotHistogramCallback   :: proc(label: cstring, values_getter: proc "c" (data: rawptr, idx: i32) -> f32, data: rawptr, values_count: i32) --- // Implied values_offset = 0, overlay_text = NULL, scale_min = FLT_MAX, scale_max = FLT_MAX, graph_size = ImVec2(0, 0)
-	Gui_PlotHistogramCallbackEx :: proc(label: cstring /* = 0 */, values_getter: proc "c" (data: rawptr /* = 0 */, idx: i32 /* = 0 */) -> f32 /* = 0 */, data: rawptr /* = 0 */, values_count: i32 /* = 0 */, values_offset: i32 /* = 0 */, overlay_text: cstring /* = NULL */, scale_min: f32 /* = FLT_MAX */, scale_max: f32 /* = FLT_MAX */, graph_size: Vec2 /* = ImVec2(0, 0) */) ---
+	Gui_PlotHistogramCallbackEx :: proc(label: cstring, values_getter: proc "c" (data: rawptr, idx: i32) -> f32, data: rawptr, values_count: i32, values_offset: i32 /* = 0 */, overlay_text: cstring /* = NULL */, scale_min: f32 /* = FLT_MAX */, scale_max: f32 /* = FLT_MAX */, graph_size: Vec2 /* = ImVec2(0, 0) */) ---
 
 	// Widgets: Menus
 	// - Use BeginMenuBar() on a window ImGuiWindowFlags_MenuBar to append to its menu bar.
 	// - Use BeginMainMenuBar() to create a menu bar at the top of the screen and append to it.
 	// - Use BeginMenu() to create a menu. You can call BeginMenu() multiple time with the same identifier to append more items to it.
 	// - Not that MenuItem() keyboardshortcuts are displayed as a convenience but _not processed_ by Dear ImGui at the moment.
-	Gui_BeginMenuBar     :: proc() -> bool ---               // append to menu-bar of current window (requires ImGuiWindowFlags_MenuBar flag set on parent window).
-	Gui_EndMenuBar       :: proc() ---                       // only call EndMenuBar() if BeginMenuBar() returns true!
-	Gui_BeginMainMenuBar :: proc() -> bool ---               // create and append to a full screen menu-bar.
-	Gui_EndMainMenuBar   :: proc() ---                       // only call EndMainMenuBar() if BeginMainMenuBar() returns true!
-	Gui_BeginMenu        :: proc(label: cstring) -> bool --- // Implied enabled = true
-	Gui_BeginMenuEx      :: proc(label: cstring /* = true */, enabled: bool /* = true */) -> bool --- // create a sub-menu entry. only call EndMenu() if this returns true!
-	Gui_EndMenu          :: proc() ---                       // only call EndMenu() if BeginMenu() returns true!
-	Gui_MenuItem         :: proc(label: cstring) -> bool --- // Implied shortcut = NULL, selected = false, enabled = true
-	Gui_MenuItemEx       :: proc(label: cstring /* = NULL */, shortcut: cstring /* = NULL */, selected: bool /* = false */, enabled: bool /* = true */) -> bool --- // return true when activated.
-	Gui_MenuItemBoolPtr  :: proc(label: cstring /* = true */, shortcut: cstring /* = true */, p_selected: ^bool /* = true */, enabled: bool /* = true */) -> bool --- // return true when activated + toggle (*p_selected) if p_selected != NULL
+	Gui_BeginMenuBar     :: proc() -> bool ---                                           // append to menu-bar of current window (requires ImGuiWindowFlags_MenuBar flag set on parent window).
+	Gui_EndMenuBar       :: proc() ---                                                   // only call EndMenuBar() if BeginMenuBar() returns true!
+	Gui_BeginMainMenuBar :: proc() -> bool ---                                           // create and append to a full screen menu-bar.
+	Gui_EndMainMenuBar   :: proc() ---                                                   // only call EndMainMenuBar() if BeginMainMenuBar() returns true!
+	Gui_BeginMenu        :: proc(label: cstring) -> bool ---                             // Implied enabled = true
+	Gui_BeginMenuEx      :: proc(label: cstring, enabled: bool /* = true */) -> bool --- // create a sub-menu entry. only call EndMenu() if this returns true!
+	Gui_EndMenu          :: proc() ---                                                   // only call EndMenu() if BeginMenu() returns true!
+	Gui_MenuItem         :: proc(label: cstring) -> bool ---                             // Implied shortcut = NULL, selected = false, enabled = true
+	Gui_MenuItemEx       :: proc(label: cstring, shortcut: cstring /* = NULL */, selected: bool /* = false */, enabled: bool /* = true */) -> bool --- // return true when activated.
+	Gui_MenuItemBoolPtr  :: proc(label: cstring, shortcut: cstring, p_selected: ^bool, enabled: bool /* = true */) -> bool --- // return true when activated + toggle (*p_selected) if p_selected != NULL
 
 	// Tooltips
 	// - Tooltips are windows following the mouse. They do not take focus away.
@@ -2777,9 +2777,9 @@ foreign lib {
 	//    This is sometimes leading to confusing mistakes. May rework this in the future.
 	//  - BeginPopup(): query popup state, if open start appending into the window. Call EndPopup() afterwards if returned true. ImGuiWindowFlags are forwarded to the window.
 	//  - BeginPopupModal(): block every interaction behind the window, cannot be closed by user, add a dimming background, has a title bar.
-	Gui_BeginPopup      :: proc(str_id: cstring /* = 0 */, flags: GuiWindowFlags /* = 0 */) -> bool --- // return true if the popup is open, and you can start outputting to it.
-	Gui_BeginPopupModal :: proc(name: cstring /* = NULL */, p_open: ^bool /* = NULL */, flags: GuiWindowFlags /* = 0 */) -> bool --- // return true if the modal is open, and you can start outputting to it.
-	Gui_EndPopup        :: proc() --- // only call EndPopup() if BeginPopupXXX() returns true!
+	Gui_BeginPopup      :: proc(str_id: cstring, flags: GuiWindowFlags /* = 0 */) -> bool --- // return true if the popup is open, and you can start outputting to it.
+	Gui_BeginPopupModal :: proc(name: cstring, p_open: ^bool /* = NULL */, flags: GuiWindowFlags /* = 0 */) -> bool --- // return true if the modal is open, and you can start outputting to it.
+	Gui_EndPopup        :: proc() ---                                                         // only call EndPopup() if BeginPopupXXX() returns true!
 
 	// Popups: open/close functions
 	//  - OpenPopup(): set popup state to open. ImGuiPopupFlags are available for opening options.
@@ -2788,10 +2788,10 @@ foreign lib {
 	//  - CloseCurrentPopup() is called by default by Selectable()/MenuItem() when activated (FIXME: need some options).
 	//  - Use ImGuiPopupFlags_NoOpenOverExistingPopup to avoid opening a popup if there's already one at the same level. This is equivalent to e.g. testing for !IsAnyPopupOpen() prior to OpenPopup().
 	//  - Use IsWindowAppearing() after BeginPopup() to tell if a window just opened.
-	Gui_OpenPopup            :: proc(str_id: cstring /* = 0 */, popup_flags: GuiPopupFlags /* = 0 */) --- // call to mark popup as open (don't call every frame!).
-	Gui_OpenPopupID          :: proc(id: GuiID /* = 0 */, popup_flags: GuiPopupFlags /* = 0 */) --- // id overload to facilitate calling from nested stacks
+	Gui_OpenPopup            :: proc(str_id: cstring, popup_flags: GuiPopupFlags /* = 0 */) --- // call to mark popup as open (don't call every frame!).
+	Gui_OpenPopupID          :: proc(id: GuiID, popup_flags: GuiPopupFlags /* = 0 */) --- // id overload to facilitate calling from nested stacks
 	Gui_OpenPopupOnItemClick :: proc(str_id: cstring /* = NULL */, popup_flags: GuiPopupFlags /* = 0 */) --- // helper to open popup when clicked on last item. Default to ImGuiPopupFlags_MouseButtonRight == 1. (note: actually triggers on the mouse _released_ event to be consistent with popup behaviors)
-	Gui_CloseCurrentPopup    :: proc() --- // manually close the popup we have begin-ed into.
+	Gui_CloseCurrentPopup    :: proc() ---                                                // manually close the popup we have begin-ed into.
 
 	// Popups: Open+Begin popup combined functions helpers to create context menus.
 	//  - Helpers to do OpenPopup+BeginPopup where the Open action is triggered by e.g. hovering an item and right-clicking.
@@ -2813,7 +2813,7 @@ foreign lib {
 	//  - IsPopupOpen(): return true if the popup is open at the current BeginPopup() level of the popup stack.
 	//  - IsPopupOpen() with ImGuiPopupFlags_AnyPopupId: return true if any popup is open at the current BeginPopup() level of the popup stack.
 	//  - IsPopupOpen() with ImGuiPopupFlags_AnyPopupId + ImGuiPopupFlags_AnyPopupLevel: return true if any popup is open.
-	Gui_IsPopupOpen :: proc(str_id: cstring /* = 0 */, flags: GuiPopupFlags /* = 0 */) -> bool --- // return true if the popup is open.
+	Gui_IsPopupOpen :: proc(str_id: cstring, flags: GuiPopupFlags /* = 0 */) -> bool --- // return true if the popup is open.
 
 	// Tables
 	// - Full-featured replacement for old Columns API.
@@ -2836,8 +2836,8 @@ foreign lib {
 	//        -                   TableNextColumn()      -> Text("Hello 0") -> TableNextColumn()      -> Text("Hello 1")  // OK: TableNextColumn() automatically gets to next row!
 	//        - TableNextRow()                           -> Text("Hello 0")                                               // Not OK! Missing TableSetColumnIndex() or TableNextColumn()! Text will not appear!
 	// - 5. Call EndTable()
-	Gui_BeginTable          :: proc(str_id: cstring /* = 0 */, columns: i32 /* = 0 */, flags: GuiTableFlags /* = 0 */) -> bool --- // Implied outer_size = ImVec2(0.0f, 0.0f), inner_width = 0.0f
-	Gui_BeginTableEx        :: proc(str_id: cstring /* = 0 */, columns: i32 /* = 0 */, flags: GuiTableFlags /* = 0 */, outer_size: Vec2 /* = ImVec2(0.0f, 0.0f) */, inner_width: f32 /* = 0.0f */) -> bool ---
+	Gui_BeginTable          :: proc(str_id: cstring, columns: i32, flags: GuiTableFlags /* = 0 */) -> bool --- // Implied outer_size = ImVec2(0.0f, 0.0f), inner_width = 0.0f
+	Gui_BeginTableEx        :: proc(str_id: cstring, columns: i32, flags: GuiTableFlags /* = 0 */, outer_size: Vec2 /* = ImVec2(0.0f, 0.0f) */, inner_width: f32 /* = 0.0f */) -> bool ---
 	Gui_EndTable            :: proc() ---                      // only call EndTable() if BeginTable() returns true!
 	Gui_TableNextRow        :: proc() ---                      // Implied row_flags = 0, min_row_height = 0.0f
 	Gui_TableNextRowEx      :: proc(row_flags: GuiTableRowFlags /* = 0 */, min_row_height: f32 /* = 0.0f */) --- // append into the first cell of a new row. 'min_row_height' include the minimum top and bottom padding aka CellPadding.y * 2.0f.
@@ -2852,8 +2852,8 @@ foreign lib {
 	// - You may manually submit headers using TableNextRow() + TableHeader() calls, but this is only useful in
 	//   some advanced use cases (e.g. adding custom widgets in header row).
 	// - Use TableSetupScrollFreeze() to lock columns/rows so they stay visible when scrolled.
-	Gui_TableSetupColumn       :: proc(label: cstring /* = 0 */, flags: GuiTableColumnFlags /* = 0 */) --- // Implied init_width_or_weight = 0.0f, user_id = 0
-	Gui_TableSetupColumnEx     :: proc(label: cstring /* = 0 */, flags: GuiTableColumnFlags /* = 0 */, init_width_or_weight: f32 /* = 0.0f */, user_id: GuiID /* = 0 */) ---
+	Gui_TableSetupColumn       :: proc(label: cstring, flags: GuiTableColumnFlags /* = 0 */) --- // Implied init_width_or_weight = 0.0f, user_id = 0
+	Gui_TableSetupColumnEx     :: proc(label: cstring, flags: GuiTableColumnFlags /* = 0 */, init_width_or_weight: f32 /* = 0.0f */, user_id: GuiID /* = 0 */) ---
 	Gui_TableSetupScrollFreeze :: proc(cols: i32, rows: i32) --- // lock columns/rows so they stay visible when scrolled.
 	Gui_TableHeader            :: proc(label: cstring) ---       // submit one header cell manually (rarely used)
 	Gui_TableHeadersRow        :: proc() ---                     // submit a row with headers cells based on data provided to TableSetupColumn() + submit context menu
@@ -2873,7 +2873,7 @@ foreign lib {
 	Gui_TableGetColumnFlags   :: proc(column_n: i32 /* = -1 */) -> GuiTableColumnFlags --- // return column flags so you can query their Enabled/Visible/Sorted/Hovered status flags. Pass -1 to use current column.
 	Gui_TableSetColumnEnabled :: proc(column_n: i32, v: bool) ---                          // change user accessible enabled/disabled state of a column. Set to false to hide the column. User can use the context menu to change this themselves (right-click in headers, or right-click in columns body with ImGuiTableFlags_ContextMenuInBody)
 	Gui_TableGetHoveredColumn :: proc() -> i32 ---                                         // return hovered column. return -1 when table is not hovered. return columns_count if the unused space at the right of visible columns is hovered. Can also use (TableGetColumnFlags() & ImGuiTableColumnFlags_IsHovered) instead.
-	Gui_TableSetBgColor       :: proc(target: GuiTableBgTarget /* = -1 */, color: u32 /* = -1 */, column_n: i32 /* = -1 */) --- // change the color of a cell, row, or column. See ImGuiTableBgTarget_ flags for details.
+	Gui_TableSetBgColor       :: proc(target: GuiTableBgTarget, color: u32, column_n: i32 /* = -1 */) --- // change the color of a cell, row, or column. See ImGuiTableBgTarget_ flags for details.
 
 	// Legacy Columns API (prefer using Tables!)
 	// - You can also use SameLine(pos_x) to mimic simplified columns.
@@ -2889,11 +2889,11 @@ foreign lib {
 
 	// Tab Bars, Tabs
 	// - Note: Tabs are automatically created by the docking system (when in 'docking' branch). Use this to create tab bars/tabs yourself.
-	Gui_BeginTabBar      :: proc(str_id: cstring /* = 0 */, flags: GuiTabBarFlags /* = 0 */) -> bool --- // create and append into a TabBar
+	Gui_BeginTabBar      :: proc(str_id: cstring, flags: GuiTabBarFlags /* = 0 */) -> bool --- // create and append into a TabBar
 	Gui_EndTabBar        :: proc() ---                                    // only call EndTabBar() if BeginTabBar() returns true!
-	Gui_BeginTabItem     :: proc(label: cstring /* = NULL */, p_open: ^bool /* = NULL */, flags: GuiTabItemFlags /* = 0 */) -> bool --- // create a Tab. Returns true if the Tab is selected.
+	Gui_BeginTabItem     :: proc(label: cstring, p_open: ^bool /* = NULL */, flags: GuiTabItemFlags /* = 0 */) -> bool --- // create a Tab. Returns true if the Tab is selected.
 	Gui_EndTabItem       :: proc() ---                                    // only call EndTabItem() if BeginTabItem() returns true!
-	Gui_TabItemButton    :: proc(label: cstring /* = 0 */, flags: GuiTabItemFlags /* = 0 */) -> bool --- // create a Tab behaving like a button. return true when clicked. cannot be selected in the tab bar.
+	Gui_TabItemButton    :: proc(label: cstring, flags: GuiTabItemFlags /* = 0 */) -> bool --- // create a Tab behaving like a button. return true when clicked. cannot be selected in the tab bar.
 	Gui_SetTabItemClosed :: proc(tab_or_docked_window_label: cstring) --- // notify TabBar or Docking system of a closed tab/window ahead (useful to reduce visual flicker on reorderable tab bars). For tab-bar: call after BeginTabBar() and before Tab submissions. Otherwise call with a window name.
 
 	// Docking
@@ -2917,14 +2917,14 @@ foreign lib {
 	// - Programmatic docking:
 	//   - There is no public API yet other than the very limited SetNextWindowDockID() function. Sorry for that!
 	//   - Read https://github.com/ocornut/imgui/wiki/Docking for examples of how to use current internal API.
-	Gui_DockSpace               :: proc(dockspace_id: GuiID) -> GuiID ---  // Implied size = ImVec2(0, 0), flags = 0, window_class = NULL
-	Gui_DockSpaceEx             :: proc(dockspace_id: GuiID /* = ImVec2(0, 0) */, size: Vec2 /* = ImVec2(0, 0) */, flags: GuiDockNodeFlags /* = 0 */, window_class: ^GuiWindowClass /* = NULL */) -> GuiID ---
-	Gui_DockSpaceOverViewport   :: proc() -> GuiID ---                     // Implied dockspace_id = 0, viewport = NULL, flags = 0, window_class = NULL
+	Gui_DockSpace               :: proc(dockspace_id: GuiID) -> GuiID ---            // Implied size = ImVec2(0, 0), flags = 0, window_class = NULL
+	Gui_DockSpaceEx             :: proc(dockspace_id: GuiID, size: Vec2 /* = ImVec2(0, 0) */, flags: GuiDockNodeFlags /* = 0 */, window_class: ^GuiWindowClass /* = NULL */) -> GuiID ---
+	Gui_DockSpaceOverViewport   :: proc() -> GuiID ---                               // Implied dockspace_id = 0, viewport = NULL, flags = 0, window_class = NULL
 	Gui_DockSpaceOverViewportEx :: proc(dockspace_id: GuiID /* = 0 */, viewport: ^GuiViewport /* = NULL */, flags: GuiDockNodeFlags /* = 0 */, window_class: ^GuiWindowClass /* = NULL */) -> GuiID ---
-	Gui_SetNextWindowDockID     :: proc(dock_id: GuiID /* = 0 */, cond: GuiCond /* = 0 */) --- // set next window dock id
-	Gui_SetNextWindowClass      :: proc(window_class: ^GuiWindowClass) --- // set next window class (control docking compatibility + provide hints to platform backend via custom viewport flags and platform parent/child relationship)
-	Gui_GetWindowDockID         :: proc() -> GuiID ---                     // get dock id of current window, or 0 if not associated to any docking node.
-	Gui_IsWindowDocked          :: proc() -> bool ---                      // is current window docked into another window?
+	Gui_SetNextWindowDockID     :: proc(dock_id: GuiID, cond: GuiCond /* = 0 */) --- // set next window dock id
+	Gui_SetNextWindowClass      :: proc(window_class: ^GuiWindowClass) ---           // set next window class (control docking compatibility + provide hints to platform backend via custom viewport flags and platform parent/child relationship)
+	Gui_GetWindowDockID         :: proc() -> GuiID ---                               // get dock id of current window, or 0 if not associated to any docking node.
+	Gui_IsWindowDocked          :: proc() -> bool ---                                // is current window docked into another window?
 
 	// Logging/Capture
 	// - All text output from the interface can be captured into tty/file/clipboard. By default, tree nodes are automatically opened during logging.
@@ -2942,10 +2942,10 @@ foreign lib {
 	// - If you stop calling BeginDragDropSource() the payload is preserved however it won't have a preview tooltip (we currently display a fallback "..." tooltip, see #1725)
 	// - An item can be both drag source and drop target.
 	Gui_BeginDragDropSource   :: proc(flags: GuiDragDropFlags /* = 0 */) -> bool --- // call after submitting an item which may be dragged. when this return true, you can call SetDragDropPayload() + EndDragDropSource()
-	Gui_SetDragDropPayload    :: proc(type: cstring /* = 0 */, data: rawptr /* = 0 */, sz: c.size_t /* = 0 */, cond: GuiCond /* = 0 */) -> bool --- // type is a user defined string of maximum 32 characters. Strings starting with '_' are reserved for dear imgui internal types. Data is copied and held by imgui. Return true when payload has been accepted.
+	Gui_SetDragDropPayload    :: proc(type: cstring, data: rawptr, sz: c.size_t, cond: GuiCond /* = 0 */) -> bool --- // type is a user defined string of maximum 32 characters. Strings starting with '_' are reserved for dear imgui internal types. Data is copied and held by imgui. Return true when payload has been accepted.
 	Gui_EndDragDropSource     :: proc() ---                                          // only call EndDragDropSource() if BeginDragDropSource() returns true!
 	Gui_BeginDragDropTarget   :: proc() -> bool ---                                  // call after submitting an item that may receive a payload. If this returns true, you can call AcceptDragDropPayload() + EndDragDropTarget()
-	Gui_AcceptDragDropPayload :: proc(type: cstring /* = 0 */, flags: GuiDragDropFlags /* = 0 */) -> ^GuiPayload --- // accept contents of a given type. If ImGuiDragDropFlags_AcceptBeforeDelivery is set you can peek into the payload before the mouse button is released.
+	Gui_AcceptDragDropPayload :: proc(type: cstring, flags: GuiDragDropFlags /* = 0 */) -> ^GuiPayload --- // accept contents of a given type. If ImGuiDragDropFlags_AcceptBeforeDelivery is set you can peek into the payload before the mouse button is released.
 	Gui_EndDragDropTarget     :: proc() ---                                          // only call EndDragDropTarget() if BeginDragDropTarget() returns true!
 	Gui_GetDragDropPayload    :: proc() -> ^GuiPayload ---                           // peek directly into the current payload from anywhere. returns NULL when drag and drop is finished or inactive. use ImGuiPayload::IsDataType() to test for the payload type.
 
@@ -3020,7 +3020,7 @@ foreign lib {
 
 	// Text Utilities
 	Gui_CalcTextSize   :: proc(text: cstring) -> Vec2 --- // Implied text_end = NULL, hide_text_after_double_hash = false, wrap_width = -1.0f
-	Gui_CalcTextSizeEx :: proc(text: cstring /* = NULL */, text_end: cstring /* = NULL */, hide_text_after_double_hash: bool /* = false */, wrap_width: f32 /* = -1.0f */) -> Vec2 ---
+	Gui_CalcTextSizeEx :: proc(text: cstring, text_end: cstring /* = NULL */, hide_text_after_double_hash: bool /* = false */, wrap_width: f32 /* = -1.0f */) -> Vec2 ---
 
 	// Color Utilities
 	Gui_ColorConvertU32ToFloat4 :: proc(_in: u32) -> Vec4 ---
@@ -3034,7 +3034,7 @@ foreign lib {
 	// - (legacy: before v1.87 (2022-02), we used ImGuiKey < 512 values to carry native/user indices as defined by each backends. This was obsoleted in 1.87 (2022-02) and completely removed in 1.91.5 (2024-11). See https://github.com/ocornut/imgui/issues/4921)
 	Gui_IsKeyDown                       :: proc(key: GuiKey) -> bool ---            // is key being held.
 	Gui_IsKeyPressed                    :: proc(key: GuiKey) -> bool ---            // Implied repeat = true
-	Gui_IsKeyPressedEx                  :: proc(key: GuiKey /* = true */, repeat: bool /* = true */) -> bool --- // was key pressed (went from !Down to Down)? Repeat rate uses io.KeyRepeatDelay / KeyRepeatRate.
+	Gui_IsKeyPressedEx                  :: proc(key: GuiKey, repeat: bool /* = true */) -> bool --- // was key pressed (went from !Down to Down)? Repeat rate uses io.KeyRepeatDelay / KeyRepeatRate.
 	Gui_IsKeyReleased                   :: proc(key: GuiKey) -> bool ---            // was key released (went from Down to !Down)?
 	Gui_IsKeyChordPressed               :: proc(key_chord: GuiKeyChord) -> bool --- // was key chord (mods + key) pressed, e.g. you can pass 'ImGuiMod_Ctrl | ImGuiKey_S' as a key-chord. This doesn't do any routing or focus check, please consider using Shortcut() function instead.
 	Gui_GetKeyPressedAmount             :: proc(key: GuiKey, repeat_delay: f32, rate: f32) -> i32 --- // uses provided repeat rate/delay. return a count, most often 0 or 1 but might be >1 if RepeatRate is small enough that DeltaTime > RepeatRate
@@ -3061,8 +3061,8 @@ foreign lib {
 	//   - Shortcut() submits a route, routes are resolved, if it currently can be routed it calls IsKeyChordPressed()
 	//     -> the function has (desirable) side-effects as it can prevents another call from getting the route.
 	// - Visualize registered routes in 'Metrics/Debugger->Inputs'.
-	Gui_Shortcut            :: proc(key_chord: GuiKeyChord /* = 0 */, flags: GuiInputFlags /* = 0 */) -> bool ---
-	Gui_SetNextItemShortcut :: proc(key_chord: GuiKeyChord /* = 0 */, flags: GuiInputFlags /* = 0 */) ---
+	Gui_Shortcut            :: proc(key_chord: GuiKeyChord, flags: GuiInputFlags /* = 0 */) -> bool ---
+	Gui_SetNextItemShortcut :: proc(key_chord: GuiKeyChord, flags: GuiInputFlags /* = 0 */) ---
 
 	// Inputs Utilities: Key/Input Ownership [BETA]
 	// - One common use case would be to allow your items to disable standard inputs behaviors such
@@ -3078,18 +3078,18 @@ foreign lib {
 	// - Dragging operations are only reported after mouse has moved a certain distance away from the initial clicking position (see 'lock_threshold' and 'io.MouseDraggingThreshold')
 	Gui_IsMouseDown                      :: proc(button: GuiMouseButton) -> bool ---        // is mouse button held?
 	Gui_IsMouseClicked                   :: proc(button: GuiMouseButton) -> bool ---        // Implied repeat = false
-	Gui_IsMouseClickedEx                 :: proc(button: GuiMouseButton /* = false */, repeat: bool /* = false */) -> bool --- // did mouse button clicked? (went from !Down to Down). Same as GetMouseClickedCount() == 1.
+	Gui_IsMouseClickedEx                 :: proc(button: GuiMouseButton, repeat: bool /* = false */) -> bool --- // did mouse button clicked? (went from !Down to Down). Same as GetMouseClickedCount() == 1.
 	Gui_IsMouseReleased                  :: proc(button: GuiMouseButton) -> bool ---        // did mouse button released? (went from Down to !Down)
 	Gui_IsMouseDoubleClicked             :: proc(button: GuiMouseButton) -> bool ---        // did mouse button double-clicked? Same as GetMouseClickedCount() == 2. (note that a double-click will also report IsMouseClicked() == true)
 	Gui_IsMouseReleasedWithDelay         :: proc(button: GuiMouseButton, delay: f32) -> bool --- // delayed mouse release (use very sparingly!). Generally used with 'delay >= io.MouseDoubleClickTime' + combined with a 'io.MouseClickedLastCount==1' test. This is a very rarely used UI idiom, but some apps use this: e.g. MS Explorer single click on an icon to rename.
 	Gui_GetMouseClickedCount             :: proc(button: GuiMouseButton) -> i32 ---         // return the number of successive mouse-clicks at the time where a click happen (otherwise 0).
 	Gui_IsMouseHoveringRect              :: proc(r_min: Vec2, r_max: Vec2) -> bool ---      // Implied clip = true
-	Gui_IsMouseHoveringRectEx            :: proc(r_min: Vec2 /* = true */, r_max: Vec2 /* = true */, clip: bool /* = true */) -> bool --- // is mouse hovering given bounding rect (in screen space). clipped by current clipping settings, but disregarding of other consideration of focus/window ordering/popup-block.
+	Gui_IsMouseHoveringRectEx            :: proc(r_min: Vec2, r_max: Vec2, clip: bool /* = true */) -> bool --- // is mouse hovering given bounding rect (in screen space). clipped by current clipping settings, but disregarding of other consideration of focus/window ordering/popup-block.
 	Gui_IsMousePosValid                  :: proc(mouse_pos: ^Vec2 /* = NULL */) -> bool --- // by convention we use (-FLT_MAX,-FLT_MAX) to denote that there is no mouse available
 	Gui_IsAnyMouseDown                   :: proc() -> bool ---                              // [WILL OBSOLETE] is any mouse button held? This was designed for backends, but prefer having backend maintain a mask of held mouse buttons, because upcoming input queue system will make this invalid.
 	Gui_GetMousePos                      :: proc() -> Vec2 ---                              // shortcut to ImGui::GetIO().MousePos provided by user, to be consistent with other calls
 	Gui_GetMousePosOnOpeningCurrentPopup :: proc() -> Vec2 ---                              // retrieve mouse position at the time of opening popup we have BeginPopup() into (helper to avoid user backing that value themselves)
-	Gui_IsMouseDragging                  :: proc(button: GuiMouseButton /* = -1.0f */, lock_threshold: f32 /* = -1.0f */) -> bool --- // is mouse dragging? (uses io.MouseDraggingThreshold if lock_threshold < 0.0f)
+	Gui_IsMouseDragging                  :: proc(button: GuiMouseButton, lock_threshold: f32 /* = -1.0f */) -> bool --- // is mouse dragging? (uses io.MouseDraggingThreshold if lock_threshold < 0.0f)
 	Gui_GetMouseDragDelta                :: proc(button: GuiMouseButton /* = 0 */, lock_threshold: f32 /* = -1.0f */) -> Vec2 --- // return the delta from the initial clicking position while the mouse button is pressed or was just released. This is locked and return 0.0f until the mouse moves past a distance threshold at least once (uses io.MouseDraggingThreshold if lock_threshold < 0.0f)
 	Gui_ResetMouseDragDelta              :: proc() ---                                      // Implied button = 0
 	Gui_ResetMouseDragDeltaEx            :: proc(button: GuiMouseButton /* = 0 */) ---      //
@@ -3107,7 +3107,7 @@ foreign lib {
 	// - Set io.IniFilename to NULL to load/save manually. Read io.WantSaveIniSettings description about handling .ini saving manually.
 	// - Important: default value "imgui.ini" is relative to current working dir! Most apps will want to lock this to an absolute path (e.g. same path as executables).
 	Gui_LoadIniSettingsFromDisk   :: proc(ini_filename: cstring) --- // call after CreateContext() and before the first call to NewFrame(). NewFrame() automatically calls LoadIniSettingsFromDisk(io.IniFilename).
-	Gui_LoadIniSettingsFromMemory :: proc(ini_data: cstring /* = 0 */, ini_size: c.size_t /* = 0 */) --- // call after CreateContext() and before the first call to NewFrame() to provide .ini data from your own data source.
+	Gui_LoadIniSettingsFromMemory :: proc(ini_data: cstring, ini_size: c.size_t /* = 0 */) --- // call after CreateContext() and before the first call to NewFrame() to provide .ini data from your own data source.
 	Gui_SaveIniSettingsToDisk     :: proc(ini_filename: cstring) --- // this is automatically called (if io.IniFilename is not empty) a few seconds after any modification that should be reflected in the .ini file (and also by DestroyContext).
 	Gui_SaveIniSettingsToMemory   :: proc(out_ini_size: ^c.size_t /* = NULL */) -> cstring --- // return a zero-terminated string with the .ini data which you can save by your own mean. call when io.WantSaveIniSettings is set, then save data by your own mean and clear io.WantSaveIniSettings.
 
@@ -3126,7 +3126,7 @@ foreign lib {
 	// - Those functions are not reliant on the current context.
 	// - DLL users: heaps and globals are not shared across DLL boundaries! You will need to call SetCurrentContext() + SetAllocatorFunctions()
 	//   for each static/DLL boundary you are calling from. Read "Context and Memory Allocators" section of imgui.cpp for more details.
-	Gui_SetAllocatorFunctions :: proc(alloc_func: GuiMemAllocFunc /* = NULL */, free_func: GuiMemFreeFunc /* = NULL */, user_data: rawptr /* = NULL */) ---
+	Gui_SetAllocatorFunctions :: proc(alloc_func: GuiMemAllocFunc, free_func: GuiMemFreeFunc, user_data: rawptr /* = NULL */) ---
 	Gui_GetAllocatorFunctions :: proc(p_alloc_func: ^GuiMemAllocFunc, p_free_func: ^GuiMemFreeFunc, p_user_data: ^rawptr) ---
 	Gui_MemAlloc              :: proc(size: c.size_t) -> rawptr ---
 	Gui_MemFree               :: proc(ptr: rawptr) ---
@@ -3163,13 +3163,13 @@ foreign lib {
 	GuiIO_AddInputCharacterUTF16            :: proc(self: ^GuiIO, _c: Wchar16) ---            // Queue a new character input from a UTF-16 character, it can be a surrogate
 	GuiIO_AddInputCharactersUTF8            :: proc(self: ^GuiIO, str: cstring) ---           // Queue a new characters input from a UTF-8 string
 	GuiIO_SetKeyEventNativeData             :: proc(self: ^GuiIO, key: GuiKey, native_keycode: i32, native_scancode: i32) --- // Implied native_legacy_index = -1
-	GuiIO_SetKeyEventNativeDataEx           :: proc(self: ^GuiIO /* = -1 */, key: GuiKey /* = -1 */, native_keycode: i32 /* = -1 */, native_scancode: i32 /* = -1 */, native_legacy_index: i32 /* = -1 */) --- // [Optional] Specify index for legacy <1.87 IsKeyXXX() functions with native indices + specify native keycode, scancode.
+	GuiIO_SetKeyEventNativeDataEx           :: proc(self: ^GuiIO, key: GuiKey, native_keycode: i32, native_scancode: i32, native_legacy_index: i32 /* = -1 */) --- // [Optional] Specify index for legacy <1.87 IsKeyXXX() functions with native indices + specify native keycode, scancode.
 	GuiIO_SetAppAcceptingEvents             :: proc(self: ^GuiIO, accepting_events: bool) --- // Set master flag for accepting key/mouse/text events (default to true). Useful if you have native dialog boxes that are interrupting your application loop/refresh, and you want to disable events being queued while your app is frozen.
 	GuiIO_ClearEventsQueue                  :: proc(self: ^GuiIO) ---                         // Clear all incoming events.
 	GuiIO_ClearInputKeys                    :: proc(self: ^GuiIO) ---                         // Clear current keyboard/gamepad state + current frame text input buffer. Equivalent to releasing all keys/buttons.
 	GuiIO_ClearInputMouse                   :: proc(self: ^GuiIO) ---                         // Clear current mouse state.
 	GuiInputTextCallbackData_DeleteChars    :: proc(self: ^GuiInputTextCallbackData, pos: i32, bytes_count: i32) ---
-	GuiInputTextCallbackData_InsertChars    :: proc(self: ^GuiInputTextCallbackData /* = NULL */, pos: i32 /* = NULL */, text: cstring /* = NULL */, text_end: cstring /* = NULL */) ---
+	GuiInputTextCallbackData_InsertChars    :: proc(self: ^GuiInputTextCallbackData, pos: i32, text: cstring, text_end: cstring /* = NULL */) ---
 	GuiInputTextCallbackData_SelectAll      :: proc(self: ^GuiInputTextCallbackData) ---
 	GuiInputTextCallbackData_SetSelection   :: proc(self: ^GuiInputTextCallbackData, s: i32, e: i32) ---
 	GuiInputTextCallbackData_ClearSelection :: proc(self: ^GuiInputTextCallbackData) ---
@@ -3180,8 +3180,8 @@ foreign lib {
 	GuiPayload_IsDelivery                   :: proc(self: ^GuiPayload) -> bool ---
 	GuiTextFilter_ImGuiTextRange_empty      :: proc(self: ^GuiTextRange) -> bool ---
 	GuiTextFilter_ImGuiTextRange_split      :: proc(self: ^GuiTextRange, separator: i8, out: ^Vector(GuiTextRange)) ---
-	GuiTextFilter_Draw                      :: proc(self: ^GuiTextFilter /* = "Filter (inc,-exc)" */, label: cstring /* = "Filter (inc,-exc)" */, width: f32 /* = 0.0f */) -> bool --- // Helper calling InputText+Build
-	GuiTextFilter_PassFilter                :: proc(self: ^GuiTextFilter /* = NULL */, text: cstring /* = NULL */, text_end: cstring /* = NULL */) -> bool ---
+	GuiTextFilter_Draw                      :: proc(self: ^GuiTextFilter, label: cstring /* = "Filter (inc,-exc)" */, width: f32 /* = 0.0f */) -> bool --- // Helper calling InputText+Build
+	GuiTextFilter_PassFilter                :: proc(self: ^GuiTextFilter, text: cstring, text_end: cstring /* = NULL */) -> bool ---
 	GuiTextFilter_Build                     :: proc(self: ^GuiTextFilter) ---
 	GuiTextFilter_Clear                     :: proc(self: ^GuiTextFilter) ---
 	GuiTextFilter_IsActive                  :: proc(self: ^GuiTextFilter) -> bool ---
@@ -3193,7 +3193,7 @@ foreign lib {
 	GuiTextBuffer_resize                    :: proc(self: ^GuiTextBuffer, size: i32) ---      // Similar to resize(0) on ImVector: empty string but don't free buffer.
 	GuiTextBuffer_reserve                   :: proc(self: ^GuiTextBuffer, capacity: i32) ---
 	GuiTextBuffer_c_str                     :: proc(self: ^GuiTextBuffer) -> cstring ---
-	GuiTextBuffer_append                    :: proc(self: ^GuiTextBuffer /* = NULL */, str: cstring /* = NULL */, str_end: cstring /* = NULL */) ---
+	GuiTextBuffer_append                    :: proc(self: ^GuiTextBuffer, str: cstring, str_end: cstring /* = NULL */) ---
 	GuiTextBuffer_appendf                   :: proc(self: ^GuiTextBuffer, fmt: cstring, #c_vararg _: ..any) ---
 	GuiTextBuffer_appendfv                  :: proc(self: ^GuiTextBuffer, fmt: cstring, args: c.va_list) ---
 
@@ -3201,11 +3201,11 @@ foreign lib {
 	// - Set***() functions find pair, insertion on demand if missing.
 	// - Sorted insertion is costly, paid once. A typical frame shouldn't need to insert any new pair.
 	GuiStorage_Clear      :: proc(self: ^GuiStorage) ---
-	GuiStorage_GetInt     :: proc(self: ^GuiStorage /* = 0 */, key: GuiID /* = 0 */, default_val: i32 /* = 0 */) -> i32 ---
+	GuiStorage_GetInt     :: proc(self: ^GuiStorage, key: GuiID, default_val: i32 /* = 0 */) -> i32 ---
 	GuiStorage_SetInt     :: proc(self: ^GuiStorage, key: GuiID, val: i32) ---
-	GuiStorage_GetBool    :: proc(self: ^GuiStorage /* = false */, key: GuiID /* = false */, default_val: bool /* = false */) -> bool ---
+	GuiStorage_GetBool    :: proc(self: ^GuiStorage, key: GuiID, default_val: bool /* = false */) -> bool ---
 	GuiStorage_SetBool    :: proc(self: ^GuiStorage, key: GuiID, val: bool) ---
-	GuiStorage_GetFloat   :: proc(self: ^GuiStorage /* = 0.0f */, key: GuiID /* = 0.0f */, default_val: f32 /* = 0.0f */) -> f32 ---
+	GuiStorage_GetFloat   :: proc(self: ^GuiStorage, key: GuiID, default_val: f32 /* = 0.0f */) -> f32 ---
 	GuiStorage_SetFloat   :: proc(self: ^GuiStorage, key: GuiID, val: f32) ---
 	GuiStorage_GetVoidPtr :: proc(self: ^GuiStorage, key: GuiID) -> rawptr --- // default_val is NULL
 	GuiStorage_SetVoidPtr :: proc(self: ^GuiStorage, key: GuiID, val: rawptr) ---
@@ -3214,17 +3214,17 @@ foreign lib {
 	// - References are only valid until a new value is added to the storage. Calling a Set***() function or a Get***Ref() function invalidates the pointer.
 	// - A typical use case where this is convenient for quick hacking (e.g. add storage during a live Edit&Continue session if you can't modify existing struct)
 	//      float* pvar = ImGui::GetFloatRef(key); ImGui::SliderFloat("var", pvar, 0, 100.0f); some_var += *pvar;
-	GuiStorage_GetIntRef     :: proc(self: ^GuiStorage /* = 0 */, key: GuiID /* = 0 */, default_val: i32 /* = 0 */) -> ^i32 ---
-	GuiStorage_GetBoolRef    :: proc(self: ^GuiStorage /* = false */, key: GuiID /* = false */, default_val: bool /* = false */) -> ^bool ---
-	GuiStorage_GetFloatRef   :: proc(self: ^GuiStorage /* = 0.0f */, key: GuiID /* = 0.0f */, default_val: f32 /* = 0.0f */) -> ^f32 ---
-	GuiStorage_GetVoidPtrRef :: proc(self: ^GuiStorage /* = NULL */, key: GuiID /* = NULL */, default_val: rawptr /* = NULL */) -> ^rawptr ---
+	GuiStorage_GetIntRef     :: proc(self: ^GuiStorage, key: GuiID, default_val: i32 /* = 0 */) -> ^i32 ---
+	GuiStorage_GetBoolRef    :: proc(self: ^GuiStorage, key: GuiID, default_val: bool /* = false */) -> ^bool ---
+	GuiStorage_GetFloatRef   :: proc(self: ^GuiStorage, key: GuiID, default_val: f32 /* = 0.0f */) -> ^f32 ---
+	GuiStorage_GetVoidPtrRef :: proc(self: ^GuiStorage, key: GuiID, default_val: rawptr /* = NULL */) -> ^rawptr ---
 
 	// Advanced: for quicker full rebuild of a storage (instead of an incremental one), you may add all your contents and then sort once.
 	GuiStorage_BuildSortByKey :: proc(self: ^GuiStorage) ---
 
 	// Obsolete: use on your own storage if you know only integer are being stored (open/close all tree nodes)
 	GuiStorage_SetAllInt :: proc(self: ^GuiStorage, val: i32) ---
-	GuiListClipper_Begin :: proc(self: ^GuiListClipper /* = -1.0f */, items_count: i32 /* = -1.0f */, items_height: f32 /* = -1.0f */) ---
+	GuiListClipper_Begin :: proc(self: ^GuiListClipper, items_count: i32, items_height: f32 /* = -1.0f */) ---
 	GuiListClipper_End   :: proc(self: ^GuiListClipper) ---         // Automatically called on the last call of Step() that returns false.
 	GuiListClipper_Step  :: proc(self: ^GuiListClipper) -> bool --- // Call until it returns false. The DisplayStart/DisplayEnd fields will be set and you can process/draw those items.
 
@@ -3239,8 +3239,8 @@ foreign lib {
 	GuiListClipper_SeekCursorForItem :: proc(self: ^GuiListClipper, item_index: i32) ---
 
 	// FIXME-OBSOLETE: May need to obsolete/cleanup those helpers.
-	Color_SetHSV                                   :: proc(self: ^Color /* = 1.0f */, h: f32 /* = 1.0f */, s: f32 /* = 1.0f */, v: f32 /* = 1.0f */, a: f32 /* = 1.0f */) ---
-	Color_HSV                                      :: proc(h: f32 /* = 1.0f */, s: f32 /* = 1.0f */, v: f32 /* = 1.0f */, a: f32 /* = 1.0f */) -> Color ---
+	Color_SetHSV                                   :: proc(self: ^Color, h: f32, s: f32, v: f32, a: f32 /* = 1.0f */) ---
+	Color_HSV                                      :: proc(h: f32, s: f32, v: f32, a: f32 /* = 1.0f */) -> Color ---
 	GuiSelectionBasicStorage_ApplyRequests         :: proc(self: ^GuiSelectionBasicStorage, ms_io: ^GuiMultiSelectIO) --- // Apply selection requests coming from BeginMultiSelect() and EndMultiSelect() functions. It uses 'items_count' passed to BeginMultiSelect()
 	GuiSelectionBasicStorage_Contains              :: proc(self: ^GuiSelectionBasicStorage, id: GuiID) -> bool --- // Query if an item id is in selection.
 	GuiSelectionBasicStorage_Clear                 :: proc(self: ^GuiSelectionBasicStorage) --- // Clear selection
@@ -3258,7 +3258,7 @@ foreign lib {
 	DrawListSplitter_Split             :: proc(self: ^DrawListSplitter, draw_list: ^DrawList, count: i32) ---
 	DrawListSplitter_Merge             :: proc(self: ^DrawListSplitter, draw_list: ^DrawList) ---
 	DrawListSplitter_SetCurrentChannel :: proc(self: ^DrawListSplitter, draw_list: ^DrawList, channel_idx: i32) ---
-	DrawList_PushClipRect              :: proc(self: ^DrawList /* = false */, clip_rect_min: Vec2 /* = false */, clip_rect_max: Vec2 /* = false */, intersect_with_current_clip_rect: bool /* = false */) --- // Render-level scissoring. This is passed down to your render function but not used for CPU-side coarse clipping. Prefer using higher-level ImGui::PushClipRect() to affect logic (hit-testing and widget culling)
+	DrawList_PushClipRect              :: proc(self: ^DrawList, clip_rect_min: Vec2, clip_rect_max: Vec2, intersect_with_current_clip_rect: bool /* = false */) --- // Render-level scissoring. This is passed down to your render function but not used for CPU-side coarse clipping. Prefer using higher-level ImGui::PushClipRect() to affect logic (hit-testing and widget culling)
 	DrawList_PushClipRectFullScreen    :: proc(self: ^DrawList) ---
 	DrawList_PopClipRect               :: proc(self: ^DrawList) ---
 	DrawList_PushTexture               :: proc(self: ^DrawList, tex_ref: TextureRef) ---
@@ -3274,34 +3274,34 @@ foreign lib {
 	//   In future versions we will use textures to provide cheaper and higher-quality circles.
 	//   Use AddNgon() and AddNgonFilled() functions if you need to guarantee a specific number of sides.
 	DrawList_AddLine                 :: proc(self: ^DrawList, p1: Vec2, p2: Vec2, col: u32) --- // Implied thickness = 1.0f
-	DrawList_AddLineEx               :: proc(self: ^DrawList /* = 1.0f */, p1: Vec2 /* = 1.0f */, p2: Vec2 /* = 1.0f */, col: u32 /* = 1.0f */, thickness: f32 /* = 1.0f */) ---
+	DrawList_AddLineEx               :: proc(self: ^DrawList, p1: Vec2, p2: Vec2, col: u32, thickness: f32 /* = 1.0f */) ---
 	DrawList_AddRect                 :: proc(self: ^DrawList, p_min: Vec2, p_max: Vec2, col: u32) --- // Implied rounding = 0.0f, flags = 0, thickness = 1.0f
-	DrawList_AddRectEx               :: proc(self: ^DrawList /* = 0.0f */, p_min: Vec2 /* = 0.0f */, p_max: Vec2 /* = 0.0f */, col: u32 /* = 0.0f */, rounding: f32 /* = 0.0f */, flags: DrawFlags /* = 0 */, thickness: f32 /* = 1.0f */) --- // a: upper-left, b: lower-right (== upper-left + size)
+	DrawList_AddRectEx               :: proc(self: ^DrawList, p_min: Vec2, p_max: Vec2, col: u32, rounding: f32 /* = 0.0f */, flags: DrawFlags /* = 0 */, thickness: f32 /* = 1.0f */) --- // a: upper-left, b: lower-right (== upper-left + size)
 	DrawList_AddRectFilled           :: proc(self: ^DrawList, p_min: Vec2, p_max: Vec2, col: u32) --- // Implied rounding = 0.0f, flags = 0
-	DrawList_AddRectFilledEx         :: proc(self: ^DrawList /* = 0.0f */, p_min: Vec2 /* = 0.0f */, p_max: Vec2 /* = 0.0f */, col: u32 /* = 0.0f */, rounding: f32 /* = 0.0f */, flags: DrawFlags /* = 0 */) --- // a: upper-left, b: lower-right (== upper-left + size)
+	DrawList_AddRectFilledEx         :: proc(self: ^DrawList, p_min: Vec2, p_max: Vec2, col: u32, rounding: f32 /* = 0.0f */, flags: DrawFlags /* = 0 */) --- // a: upper-left, b: lower-right (== upper-left + size)
 	DrawList_AddRectFilledMultiColor :: proc(self: ^DrawList, p_min: Vec2, p_max: Vec2, col_upr_left: u32, col_upr_right: u32, col_bot_right: u32, col_bot_left: u32) ---
 	DrawList_AddQuad                 :: proc(self: ^DrawList, p1: Vec2, p2: Vec2, p3: Vec2, p4: Vec2, col: u32) --- // Implied thickness = 1.0f
-	DrawList_AddQuadEx               :: proc(self: ^DrawList /* = 1.0f */, p1: Vec2 /* = 1.0f */, p2: Vec2 /* = 1.0f */, p3: Vec2 /* = 1.0f */, p4: Vec2 /* = 1.0f */, col: u32 /* = 1.0f */, thickness: f32 /* = 1.0f */) ---
+	DrawList_AddQuadEx               :: proc(self: ^DrawList, p1: Vec2, p2: Vec2, p3: Vec2, p4: Vec2, col: u32, thickness: f32 /* = 1.0f */) ---
 	DrawList_AddQuadFilled           :: proc(self: ^DrawList, p1: Vec2, p2: Vec2, p3: Vec2, p4: Vec2, col: u32) ---
 	DrawList_AddTriangle             :: proc(self: ^DrawList, p1: Vec2, p2: Vec2, p3: Vec2, col: u32) --- // Implied thickness = 1.0f
-	DrawList_AddTriangleEx           :: proc(self: ^DrawList /* = 1.0f */, p1: Vec2 /* = 1.0f */, p2: Vec2 /* = 1.0f */, p3: Vec2 /* = 1.0f */, col: u32 /* = 1.0f */, thickness: f32 /* = 1.0f */) ---
+	DrawList_AddTriangleEx           :: proc(self: ^DrawList, p1: Vec2, p2: Vec2, p3: Vec2, col: u32, thickness: f32 /* = 1.0f */) ---
 	DrawList_AddTriangleFilled       :: proc(self: ^DrawList, p1: Vec2, p2: Vec2, p3: Vec2, col: u32) ---
 	DrawList_AddCircle               :: proc(self: ^DrawList, center: Vec2, radius: f32, col: u32) --- // Implied num_segments = 0, thickness = 1.0f
-	DrawList_AddCircleEx             :: proc(self: ^DrawList /* = 0 */, center: Vec2 /* = 0 */, radius: f32 /* = 0 */, col: u32 /* = 0 */, num_segments: i32 /* = 0 */, thickness: f32 /* = 1.0f */) ---
-	DrawList_AddCircleFilled         :: proc(self: ^DrawList /* = 0 */, center: Vec2 /* = 0 */, radius: f32 /* = 0 */, col: u32 /* = 0 */, num_segments: i32 /* = 0 */) ---
+	DrawList_AddCircleEx             :: proc(self: ^DrawList, center: Vec2, radius: f32, col: u32, num_segments: i32 /* = 0 */, thickness: f32 /* = 1.0f */) ---
+	DrawList_AddCircleFilled         :: proc(self: ^DrawList, center: Vec2, radius: f32, col: u32, num_segments: i32 /* = 0 */) ---
 	DrawList_AddNgon                 :: proc(self: ^DrawList, center: Vec2, radius: f32, col: u32, num_segments: i32) --- // Implied thickness = 1.0f
-	DrawList_AddNgonEx               :: proc(self: ^DrawList /* = 1.0f */, center: Vec2 /* = 1.0f */, radius: f32 /* = 1.0f */, col: u32 /* = 1.0f */, num_segments: i32 /* = 1.0f */, thickness: f32 /* = 1.0f */) ---
+	DrawList_AddNgonEx               :: proc(self: ^DrawList, center: Vec2, radius: f32, col: u32, num_segments: i32, thickness: f32 /* = 1.0f */) ---
 	DrawList_AddNgonFilled           :: proc(self: ^DrawList, center: Vec2, radius: f32, col: u32, num_segments: i32) ---
 	DrawList_AddEllipse              :: proc(self: ^DrawList, center: Vec2, radius: Vec2, col: u32) --- // Implied rot = 0.0f, num_segments = 0, thickness = 1.0f
-	DrawList_AddEllipseEx            :: proc(self: ^DrawList /* = 0.0f */, center: Vec2 /* = 0.0f */, radius: Vec2 /* = 0.0f */, col: u32 /* = 0.0f */, rot: f32 /* = 0.0f */, num_segments: i32 /* = 0 */, thickness: f32 /* = 1.0f */) ---
+	DrawList_AddEllipseEx            :: proc(self: ^DrawList, center: Vec2, radius: Vec2, col: u32, rot: f32 /* = 0.0f */, num_segments: i32 /* = 0 */, thickness: f32 /* = 1.0f */) ---
 	DrawList_AddEllipseFilled        :: proc(self: ^DrawList, center: Vec2, radius: Vec2, col: u32) --- // Implied rot = 0.0f, num_segments = 0
-	DrawList_AddEllipseFilledEx      :: proc(self: ^DrawList /* = 0.0f */, center: Vec2 /* = 0.0f */, radius: Vec2 /* = 0.0f */, col: u32 /* = 0.0f */, rot: f32 /* = 0.0f */, num_segments: i32 /* = 0 */) ---
+	DrawList_AddEllipseFilledEx      :: proc(self: ^DrawList, center: Vec2, radius: Vec2, col: u32, rot: f32 /* = 0.0f */, num_segments: i32 /* = 0 */) ---
 	DrawList_AddText                 :: proc(self: ^DrawList, pos: Vec2, col: u32, text_begin: cstring) --- // Implied text_end = NULL
-	DrawList_AddTextEx               :: proc(self: ^DrawList /* = NULL */, pos: Vec2 /* = NULL */, col: u32 /* = NULL */, text_begin: cstring /* = NULL */, text_end: cstring /* = NULL */) ---
+	DrawList_AddTextEx               :: proc(self: ^DrawList, pos: Vec2, col: u32, text_begin: cstring, text_end: cstring /* = NULL */) ---
 	DrawList_AddTextImFontPtr        :: proc(self: ^DrawList, font: ^Font, font_size: f32, pos: Vec2, col: u32, text_begin: cstring) --- // Implied text_end = NULL, wrap_width = 0.0f, cpu_fine_clip_rect = NULL
-	DrawList_AddTextImFontPtrEx      :: proc(self: ^DrawList /* = NULL */, font: ^Font /* = NULL */, font_size: f32 /* = NULL */, pos: Vec2 /* = NULL */, col: u32 /* = NULL */, text_begin: cstring /* = NULL */, text_end: cstring /* = NULL */, wrap_width: f32 /* = 0.0f */, cpu_fine_clip_rect: ^Vec4 /* = NULL */) ---
-	DrawList_AddBezierCubic          :: proc(self: ^DrawList /* = 0 */, p1: Vec2 /* = 0 */, p2: Vec2 /* = 0 */, p3: Vec2 /* = 0 */, p4: Vec2 /* = 0 */, col: u32 /* = 0 */, thickness: f32 /* = 0 */, num_segments: i32 /* = 0 */) --- // Cubic Bezier (4 control points)
-	DrawList_AddBezierQuadratic      :: proc(self: ^DrawList /* = 0 */, p1: Vec2 /* = 0 */, p2: Vec2 /* = 0 */, p3: Vec2 /* = 0 */, col: u32 /* = 0 */, thickness: f32 /* = 0 */, num_segments: i32 /* = 0 */) --- // Quadratic Bezier (3 control points)
+	DrawList_AddTextImFontPtrEx      :: proc(self: ^DrawList, font: ^Font, font_size: f32, pos: Vec2, col: u32, text_begin: cstring, text_end: cstring /* = NULL */, wrap_width: f32 /* = 0.0f */, cpu_fine_clip_rect: ^Vec4 /* = NULL */) ---
+	DrawList_AddBezierCubic          :: proc(self: ^DrawList, p1: Vec2, p2: Vec2, p3: Vec2, p4: Vec2, col: u32, thickness: f32, num_segments: i32 /* = 0 */) --- // Cubic Bezier (4 control points)
+	DrawList_AddBezierQuadratic      :: proc(self: ^DrawList, p1: Vec2, p2: Vec2, p3: Vec2, col: u32, thickness: f32, num_segments: i32 /* = 0 */) --- // Quadratic Bezier (3 control points)
 
 	// General polygon
 	// - Only simple polygons are supported by filling functions (no self-intersections, no holes).
@@ -3315,10 +3315,10 @@ foreign lib {
 	// - "p_min" and "p_max" represent the upper-left and lower-right corners of the rectangle.
 	// - "uv_min" and "uv_max" represent the normalized texture coordinates to use for those corners. Using (0,0)->(1,1) texture coordinates will generally display the entire texture.
 	DrawList_AddImage        :: proc(self: ^DrawList, tex_ref: TextureRef, p_min: Vec2, p_max: Vec2) --- // Implied uv_min = ImVec2(0, 0), uv_max = ImVec2(1, 1), col = IM_COL32_WHITE
-	DrawList_AddImageEx      :: proc(self: ^DrawList /* = ImVec2(0, 0) */, tex_ref: TextureRef /* = ImVec2(0, 0) */, p_min: Vec2 /* = ImVec2(0, 0) */, p_max: Vec2 /* = ImVec2(0, 0) */, uv_min: Vec2 /* = ImVec2(0, 0) */, uv_max: Vec2 /* = ImVec2(1, 1) */, col: u32 /* = IM_COL32_WHITE */) ---
+	DrawList_AddImageEx      :: proc(self: ^DrawList, tex_ref: TextureRef, p_min: Vec2, p_max: Vec2, uv_min: Vec2 /* = ImVec2(0, 0) */, uv_max: Vec2 /* = ImVec2(1, 1) */, col: u32 /* = IM_COL32_WHITE */) ---
 	DrawList_AddImageQuad    :: proc(self: ^DrawList, tex_ref: TextureRef, p1: Vec2, p2: Vec2, p3: Vec2, p4: Vec2) --- // Implied uv1 = ImVec2(0, 0), uv2 = ImVec2(1, 0), uv3 = ImVec2(1, 1), uv4 = ImVec2(0, 1), col = IM_COL32_WHITE
-	DrawList_AddImageQuadEx  :: proc(self: ^DrawList /* = ImVec2(0, 0) */, tex_ref: TextureRef /* = ImVec2(0, 0) */, p1: Vec2 /* = ImVec2(0, 0) */, p2: Vec2 /* = ImVec2(0, 0) */, p3: Vec2 /* = ImVec2(0, 0) */, p4: Vec2 /* = ImVec2(0, 0) */, uv1: Vec2 /* = ImVec2(0, 0) */, uv2: Vec2 /* = ImVec2(1, 0) */, uv3: Vec2 /* = ImVec2(1, 1) */, uv4: Vec2 /* = ImVec2(0, 1) */, col: u32 /* = IM_COL32_WHITE */) ---
-	DrawList_AddImageRounded :: proc(self: ^DrawList /* = 0 */, tex_ref: TextureRef /* = 0 */, p_min: Vec2 /* = 0 */, p_max: Vec2 /* = 0 */, uv_min: Vec2 /* = 0 */, uv_max: Vec2 /* = 0 */, col: u32 /* = 0 */, rounding: f32 /* = 0 */, flags: DrawFlags /* = 0 */) ---
+	DrawList_AddImageQuadEx  :: proc(self: ^DrawList, tex_ref: TextureRef, p1: Vec2, p2: Vec2, p3: Vec2, p4: Vec2, uv1: Vec2 /* = ImVec2(0, 0) */, uv2: Vec2 /* = ImVec2(1, 0) */, uv3: Vec2 /* = ImVec2(1, 1) */, uv4: Vec2 /* = ImVec2(0, 1) */, col: u32 /* = IM_COL32_WHITE */) ---
+	DrawList_AddImageRounded :: proc(self: ^DrawList, tex_ref: TextureRef, p_min: Vec2, p_max: Vec2, uv_min: Vec2, uv_max: Vec2, col: u32, rounding: f32, flags: DrawFlags /* = 0 */) ---
 
 	// Stateful path API, add points then finish with PathFillConvex() or PathStroke()
 	// - Important: filled shapes must always use clockwise winding order! The anti-aliasing fringe depends on it. Counter-clockwise shapes will have "inward" anti-aliasing.
@@ -3328,14 +3328,14 @@ foreign lib {
 	DrawList_PathLineToMergeDuplicate   :: proc(self: ^DrawList, pos: Vec2) ---
 	DrawList_PathFillConvex             :: proc(self: ^DrawList, col: u32) ---
 	DrawList_PathFillConcave            :: proc(self: ^DrawList, col: u32) ---
-	DrawList_PathStroke                 :: proc(self: ^DrawList /* = 0 */, col: u32 /* = 0 */, flags: DrawFlags /* = 0 */, thickness: f32 /* = 1.0f */) ---
-	DrawList_PathArcTo                  :: proc(self: ^DrawList /* = 0 */, center: Vec2 /* = 0 */, radius: f32 /* = 0 */, a_min: f32 /* = 0 */, a_max: f32 /* = 0 */, num_segments: i32 /* = 0 */) ---
+	DrawList_PathStroke                 :: proc(self: ^DrawList, col: u32, flags: DrawFlags /* = 0 */, thickness: f32 /* = 1.0f */) ---
+	DrawList_PathArcTo                  :: proc(self: ^DrawList, center: Vec2, radius: f32, a_min: f32, a_max: f32, num_segments: i32 /* = 0 */) ---
 	DrawList_PathArcToFast              :: proc(self: ^DrawList, center: Vec2, radius: f32, a_min_of_12: i32, a_max_of_12: i32) --- // Use precomputed angles for a 12 steps circle
 	DrawList_PathEllipticalArcTo        :: proc(self: ^DrawList, center: Vec2, radius: Vec2, rot: f32, a_min: f32, a_max: f32) --- // Implied num_segments = 0
-	DrawList_PathEllipticalArcToEx      :: proc(self: ^DrawList /* = 0 */, center: Vec2 /* = 0 */, radius: Vec2 /* = 0 */, rot: f32 /* = 0 */, a_min: f32 /* = 0 */, a_max: f32 /* = 0 */, num_segments: i32 /* = 0 */) --- // Ellipse
-	DrawList_PathBezierCubicCurveTo     :: proc(self: ^DrawList /* = 0 */, p2: Vec2 /* = 0 */, p3: Vec2 /* = 0 */, p4: Vec2 /* = 0 */, num_segments: i32 /* = 0 */) --- // Cubic Bezier (4 control points)
-	DrawList_PathBezierQuadraticCurveTo :: proc(self: ^DrawList /* = 0 */, p2: Vec2 /* = 0 */, p3: Vec2 /* = 0 */, num_segments: i32 /* = 0 */) --- // Quadratic Bezier (3 control points)
-	DrawList_PathRect                   :: proc(self: ^DrawList /* = 0.0f */, rect_min: Vec2 /* = 0.0f */, rect_max: Vec2 /* = 0.0f */, rounding: f32 /* = 0.0f */, flags: DrawFlags /* = 0 */) ---
+	DrawList_PathEllipticalArcToEx      :: proc(self: ^DrawList, center: Vec2, radius: Vec2, rot: f32, a_min: f32, a_max: f32, num_segments: i32 /* = 0 */) --- // Ellipse
+	DrawList_PathBezierCubicCurveTo     :: proc(self: ^DrawList, p2: Vec2, p3: Vec2, p4: Vec2, num_segments: i32 /* = 0 */) --- // Cubic Bezier (4 control points)
+	DrawList_PathBezierQuadraticCurveTo :: proc(self: ^DrawList, p2: Vec2, p3: Vec2, num_segments: i32 /* = 0 */) --- // Quadratic Bezier (3 control points)
+	DrawList_PathRect                   :: proc(self: ^DrawList, rect_min: Vec2, rect_max: Vec2, rounding: f32 /* = 0.0f */, flags: DrawFlags /* = 0 */) ---
 
 	// Advanced: Draw Callbacks
 	// - May be used to alter render state (change sampler, blending, current shader). May be used to emit custom rendering commands (difficult to do correctly, but possible).
@@ -3347,7 +3347,7 @@ foreign lib {
 	//   - If userdata_size > 0,  we copy/store 'userdata_size' bytes pointed to by 'userdata'. We store them in a buffer stored inside the drawlist. ImDrawCmd::UserCallbackData will point inside that buffer so you have to retrieve data from there. Your callback may need to use ImDrawCmd::UserCallbackDataSize if you expect dynamically-sized data.
 	//   - Support for userdata_size > 0 was added in v1.91.4, October 2024. So earlier code always only allowed to copy/store a simple void*.
 	DrawList_AddCallback   :: proc(self: ^DrawList, callback: DrawCallback, userdata: rawptr) --- // Implied userdata_size = 0
-	DrawList_AddCallbackEx :: proc(self: ^DrawList /* = 0 */, callback: DrawCallback /* = 0 */, userdata: rawptr /* = 0 */, userdata_size: c.size_t /* = 0 */) ---
+	DrawList_AddCallbackEx :: proc(self: ^DrawList, callback: DrawCallback, userdata: rawptr, userdata_size: c.size_t /* = 0 */) ---
 
 	// Advanced: Miscellaneous
 	DrawList_AddDrawCmd  :: proc(self: ^DrawList) ---              // This is useful if you need to forcefully create a new draw call (to allow for dependent rendering / blending). Otherwise primitives are merged into the same draw-call as much as possible
@@ -3410,17 +3410,17 @@ foreign lib {
 	FontGlyphRangesBuilder_GetBit                  :: proc(self: ^FontGlyphRangesBuilder, n: c.size_t) -> bool --- // Get bit n in the array
 	FontGlyphRangesBuilder_SetBit                  :: proc(self: ^FontGlyphRangesBuilder, n: c.size_t) --- // Set bit n in the array
 	FontGlyphRangesBuilder_AddChar                 :: proc(self: ^FontGlyphRangesBuilder, _c: Wchar) --- // Add character
-	FontGlyphRangesBuilder_AddText                 :: proc(self: ^FontGlyphRangesBuilder /* = NULL */, text: cstring /* = NULL */, text_end: cstring /* = NULL */) --- // Add string (each character of the UTF-8 string are added)
+	FontGlyphRangesBuilder_AddText                 :: proc(self: ^FontGlyphRangesBuilder, text: cstring, text_end: cstring /* = NULL */) --- // Add string (each character of the UTF-8 string are added)
 	FontGlyphRangesBuilder_AddRanges               :: proc(self: ^FontGlyphRangesBuilder, ranges: ^Wchar) --- // Add ranges, e.g. builder.AddRanges(ImFontAtlas::GetGlyphRangesDefault()) to force add all of ASCII/Latin+Ext
 	FontGlyphRangesBuilder_BuildRanges             :: proc(self: ^FontGlyphRangesBuilder, out_ranges: ^Vector(Wchar)) --- // Output new ranges (ImVector_Construct()/ImVector_Destruct() can be used to safely construct out_ranges)
 	FontAtlas_AddFont                              :: proc(self: ^FontAtlas, font_cfg: ^FontConfig) -> ^Font ---
-	FontAtlas_AddFontDefault                       :: proc(self: ^FontAtlas /* = NULL */, font_cfg: ^FontConfig /* = NULL */) -> ^Font --- // Selects between AddFontDefaultVector() and AddFontDefaultBitmap().
-	FontAtlas_AddFontDefaultVector                 :: proc(self: ^FontAtlas /* = NULL */, font_cfg: ^FontConfig /* = NULL */) -> ^Font --- // Embedded scalable font. Recommended at any higher size.
-	FontAtlas_AddFontDefaultBitmap                 :: proc(self: ^FontAtlas /* = NULL */, font_cfg: ^FontConfig /* = NULL */) -> ^Font --- // Embedded classic pixel-clean font. Recommended at Size 13px with no scaling.
-	FontAtlas_AddFontFromFileTTF                   :: proc(self: ^FontAtlas /* = 0.0f */, filename: cstring /* = 0.0f */, size_pixels: f32 /* = 0.0f */, font_cfg: ^FontConfig /* = NULL */, glyph_ranges: ^Wchar /* = NULL */) -> ^Font ---
-	FontAtlas_AddFontFromMemoryTTF                 :: proc(self: ^FontAtlas /* = 0.0f */, font_data: rawptr /* = 0.0f */, font_data_size: i32 /* = 0.0f */, size_pixels: f32 /* = 0.0f */, font_cfg: ^FontConfig /* = NULL */, glyph_ranges: ^Wchar /* = NULL */) -> ^Font --- // Note: Transfer ownership of 'ttf_data' to ImFontAtlas! Will be deleted after destruction of the atlas. Set font_cfg->FontDataOwnedByAtlas=false to keep ownership of your data and it won't be freed.
-	FontAtlas_AddFontFromMemoryCompressedTTF       :: proc(self: ^FontAtlas /* = 0.0f */, compressed_font_data: rawptr /* = 0.0f */, compressed_font_data_size: i32 /* = 0.0f */, size_pixels: f32 /* = 0.0f */, font_cfg: ^FontConfig /* = NULL */, glyph_ranges: ^Wchar /* = NULL */) -> ^Font --- // 'compressed_font_data' still owned by caller. Compress with binary_to_compressed_c.cpp.
-	FontAtlas_AddFontFromMemoryCompressedBase85TTF :: proc(self: ^FontAtlas /* = 0.0f */, compressed_font_data_base85: cstring /* = 0.0f */, size_pixels: f32 /* = 0.0f */, font_cfg: ^FontConfig /* = NULL */, glyph_ranges: ^Wchar /* = NULL */) -> ^Font --- // 'compressed_font_data_base85' still owned by caller. Compress with binary_to_compressed_c.cpp with -base85 parameter.
+	FontAtlas_AddFontDefault                       :: proc(self: ^FontAtlas, font_cfg: ^FontConfig /* = NULL */) -> ^Font --- // Selects between AddFontDefaultVector() and AddFontDefaultBitmap().
+	FontAtlas_AddFontDefaultVector                 :: proc(self: ^FontAtlas, font_cfg: ^FontConfig /* = NULL */) -> ^Font --- // Embedded scalable font. Recommended at any higher size.
+	FontAtlas_AddFontDefaultBitmap                 :: proc(self: ^FontAtlas, font_cfg: ^FontConfig /* = NULL */) -> ^Font --- // Embedded classic pixel-clean font. Recommended at Size 13px with no scaling.
+	FontAtlas_AddFontFromFileTTF                   :: proc(self: ^FontAtlas, filename: cstring, size_pixels: f32 /* = 0.0f */, font_cfg: ^FontConfig /* = NULL */, glyph_ranges: ^Wchar /* = NULL */) -> ^Font ---
+	FontAtlas_AddFontFromMemoryTTF                 :: proc(self: ^FontAtlas, font_data: rawptr, font_data_size: i32, size_pixels: f32 /* = 0.0f */, font_cfg: ^FontConfig /* = NULL */, glyph_ranges: ^Wchar /* = NULL */) -> ^Font --- // Note: Transfer ownership of 'ttf_data' to ImFontAtlas! Will be deleted after destruction of the atlas. Set font_cfg->FontDataOwnedByAtlas=false to keep ownership of your data and it won't be freed.
+	FontAtlas_AddFontFromMemoryCompressedTTF       :: proc(self: ^FontAtlas, compressed_font_data: rawptr, compressed_font_data_size: i32, size_pixels: f32 /* = 0.0f */, font_cfg: ^FontConfig /* = NULL */, glyph_ranges: ^Wchar /* = NULL */) -> ^Font --- // 'compressed_font_data' still owned by caller. Compress with binary_to_compressed_c.cpp.
+	FontAtlas_AddFontFromMemoryCompressedBase85TTF :: proc(self: ^FontAtlas, compressed_font_data_base85: cstring, size_pixels: f32 /* = 0.0f */, font_cfg: ^FontConfig /* = NULL */, glyph_ranges: ^Wchar /* = NULL */) -> ^Font --- // 'compressed_font_data_base85' still owned by caller. Compress with binary_to_compressed_c.cpp with -base85 parameter.
 	FontAtlas_RemoveFont                           :: proc(self: ^FontAtlas, font: ^Font) ---
 	FontAtlas_Clear                                :: proc(self: ^FontAtlas) --- // Clear everything (input fonts, output glyphs/textures).
 	FontAtlas_CompactCache                         :: proc(self: ^FontAtlas) --- // Compact cached glyphs and texture.
@@ -3451,7 +3451,7 @@ foreign lib {
 	//   - AddCustomRectRegular()   --> Renamed to AddCustomRect()
 	//   - AddCustomRectFontGlyph() --> Prefer using custom ImFontLoader inside ImFontConfig
 	//   - ImFontAtlasCustomRect    --> Renamed to ImFontAtlasRect
-	FontAtlas_AddCustomRect       :: proc(self: ^FontAtlas /* = NULL */, width: i32 /* = NULL */, height: i32 /* = NULL */, out_r: ^FontAtlasRect /* = NULL */) -> FontAtlasRectId --- // Register a rectangle. Return -1 (ImFontAtlasRectId_Invalid) on error.
+	FontAtlas_AddCustomRect       :: proc(self: ^FontAtlas, width: i32, height: i32, out_r: ^FontAtlasRect /* = NULL */) -> FontAtlasRectId --- // Register a rectangle. Return -1 (ImFontAtlasRectId_Invalid) on error.
 	FontAtlas_RemoveCustomRect    :: proc(self: ^FontAtlas, id: FontAtlasRectId) ---     // Unregister a rectangle. Existing pixels will stay in texture until resized / garbage collected.
 	FontAtlas_GetCustomRect       :: proc(self: ^FontAtlas, id: FontAtlasRectId, out_r: ^FontAtlasRect) -> bool --- // Get rectangle coordinates for current texture. Valid immediately, never store this (read above)!
 	FontBaked_ClearOutputData     :: proc(self: ^FontBaked) ---
@@ -3467,13 +3467,13 @@ foreign lib {
 	// 'max_width' stops rendering after a certain width (could be turned into a 2d size). FLT_MAX to disable.
 	// 'wrap_width' enable automatic word-wrapping across multiple lines to fit into given width. 0.0f to disable.
 	Font_GetFontBaked         :: proc(self: ^Font, font_size: f32) -> ^FontBaked --- // Implied density = -1.0f
-	Font_GetFontBakedEx       :: proc(self: ^Font /* = -1.0f */, font_size: f32 /* = -1.0f */, density: f32 /* = -1.0f */) -> ^FontBaked --- // Get or create baked data for given size
+	Font_GetFontBakedEx       :: proc(self: ^Font, font_size: f32, density: f32 /* = -1.0f */) -> ^FontBaked --- // Get or create baked data for given size
 	Font_CalcTextSizeA        :: proc(self: ^Font, size: f32, max_width: f32, wrap_width: f32, text_begin: cstring) -> Vec2 --- // Implied text_end = NULL, out_remaining = NULL
-	Font_CalcTextSizeAEx      :: proc(self: ^Font /* = NULL */, size: f32 /* = NULL */, max_width: f32 /* = NULL */, wrap_width: f32 /* = NULL */, text_begin: cstring /* = NULL */, text_end: cstring /* = NULL */, out_remaining: ^cstring /* = NULL */) -> Vec2 ---
+	Font_CalcTextSizeAEx      :: proc(self: ^Font, size: f32, max_width: f32, wrap_width: f32, text_begin: cstring, text_end: cstring /* = NULL */, out_remaining: ^cstring /* = NULL */) -> Vec2 ---
 	Font_CalcWordWrapPosition :: proc(self: ^Font, size: f32, text: cstring, text_end: cstring, wrap_width: f32) -> cstring ---
 	Font_RenderChar           :: proc(self: ^Font, draw_list: ^DrawList, size: f32, pos: Vec2, col: u32, _c: Wchar) --- // Implied cpu_fine_clip = NULL
-	Font_RenderCharEx         :: proc(self: ^Font /* = NULL */, draw_list: ^DrawList /* = NULL */, size: f32 /* = NULL */, pos: Vec2 /* = NULL */, col: u32 /* = NULL */, _c: Wchar /* = NULL */, cpu_fine_clip: ^Vec4 /* = NULL */) ---
-	Font_RenderText           :: proc(self: ^Font /* = 0.0f */, draw_list: ^DrawList /* = 0.0f */, size: f32 /* = 0.0f */, pos: Vec2 /* = 0.0f */, col: u32 /* = 0.0f */, clip_rect: Vec4 /* = 0.0f */, text_begin: cstring /* = 0.0f */, text_end: cstring /* = 0.0f */, wrap_width: f32 /* = 0.0f */, flags: DrawTextFlags /* = 0 */) ---
+	Font_RenderCharEx         :: proc(self: ^Font, draw_list: ^DrawList, size: f32, pos: Vec2, col: u32, _c: Wchar, cpu_fine_clip: ^Vec4 /* = NULL */) ---
+	Font_RenderText           :: proc(self: ^Font, draw_list: ^DrawList, size: f32, pos: Vec2, col: u32, clip_rect: Vec4, text_begin: cstring, text_end: cstring, wrap_width: f32 /* = 0.0f */, flags: DrawTextFlags /* = 0 */) ---
 
 	// [Internal] Don't use!
 	Font_ClearOutputData    :: proc(self: ^Font) ---
