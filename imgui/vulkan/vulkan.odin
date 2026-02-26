@@ -388,8 +388,8 @@ RenderDrawData :: proc(
 				draw_list.IdxBuffer.Data,
 				int(draw_list.IdxBuffer.Size * size_of(imgui.DrawIdx)),
 			)
-			vtx_dst = rawptr(uintptr(vtx_dst) + uintptr(draw_list.VtxBuffer.Size))
-			idx_dst = rawptr(uintptr(idx_dst) + uintptr(draw_list.IdxBuffer.Size))
+			vtx_dst = rawptr(uintptr(vtx_dst) + uintptr(draw_list.VtxBuffer.Size * size_of(imgui.DrawVert)))
+			idx_dst = rawptr(uintptr(idx_dst) + uintptr(draw_list.IdxBuffer.Size * size_of(imgui.DrawIdx)))
 		}
 		range := [?]vk.MappedMemoryRange {
 			{
