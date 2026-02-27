@@ -56,6 +56,19 @@ bit_setify = {
 	"ImGuiTypingSelectFlags_" = "GuiTypingSelectFlag"
 	"ImGuiOldColumnFlags_" = "GuiOldColumnFlag"
 	"ImGuiDebugLogFlags_" = "GuiDebugLogFlag"
+
+	"ImGuiDockNodeFlagsPrivate_" = "GuiDockNodePrivateFlag"
+	"ImGuiItemFlagsPrivate_" = "ImGuiItemFlagPrivate"
+	"ImGuiHoveredFlagsPrivate_" = "ImGuiHoveredFlagPrivate"
+	"ImGuiInputTextFlagsPrivate_" = "ImGuiInputTextFlagPrivate"
+	"ImGuiButtonFlagsPrivate_" = "ImGuiButtonFlagPrivate"
+	"ImGuiComboFlagsPrivate_" = "ImGuiComboFlagPrivate"
+	"ImGuiSliderFlagsPrivate_" = "ImGuiSliderFlagPrivate"
+	"ImGuiSelectableFlagsPrivate_" = "ImGuiSelectableFlagPrivate"
+	"ImGuiTreeNodeFlagsPrivate_" = "ImGuiTreeNodeFlagPrivate"
+	"ImGuiInputFlagsPrivate_" = "ImGuiInputFlagPrivate"
+	"ImGuiTabBarFlagsPrivate_" = "ImGuiTabBarFlagPrivate"
+	"ImGuiTabItemFlagsPrivate_" = "ImGuiTabItemFlagPrivate"
 }
 
 rename = {
