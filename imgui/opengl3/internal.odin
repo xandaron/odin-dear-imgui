@@ -126,6 +126,7 @@ import imgui ".."
 
 import "base:runtime"
 import "core:mem"
+import "core:fmt"
 import "vendor:OpenGL"
 
 
@@ -228,6 +229,8 @@ SetupRenderState :: proc(
 		OpenGL.BindSampler(0, 0)
 	}
 
+	OpenGL.BindVertexArray(vertex_array_object);
+
 	// Bind vertex/index buffers and setup attributes for ImDrawVert
 	OpenGL.BindBuffer(OpenGL.ARRAY_BUFFER, bd.VboHandle)
 	OpenGL.BindBuffer(OpenGL.ELEMENT_ARRAY_BUFFER, bd.ElementsHandle)
@@ -276,13 +279,13 @@ CheckShader :: proc(handle: u32, desc: cstring) -> bool {
 	OpenGL.GetShaderiv(handle, OpenGL.COMPILE_STATUS, &status)
 	OpenGL.GetShaderiv(handle, OpenGL.INFO_LOG_LENGTH, &log_length)
 	if status == 0 {
-		// fprintf(stderr, "ERROR: CreateDeviceObjects: failed to compile %s! With GLSL: %s\n", desc, bd.GlslVersionString)
+		fmt.printfln("ERROR: CreateDeviceObjects: failed to compile %s! With GLSL: %s", desc, cstring(&bd.GlslVersionString[0]))
 	}
 	if log_length > 1 {
 		buf := imgui.NewVector(u8)
 		imgui.VectorResize(&buf, log_length + 1)
 		OpenGL.GetShaderInfoLog(handle, log_length, nil, imgui.VectorBegin(buf))
-		// fprintf(stderr, "%s\n", buf.begin());
+		fmt.printfln(string(buf.Data[:buf.Size]))
 	}
 	return status != 0
 }
@@ -294,13 +297,13 @@ CheckProgram :: proc(handle: u32, desc: cstring) -> bool {
 	OpenGL.GetProgramiv(handle, OpenGL.LINK_STATUS, &status)
 	OpenGL.GetProgramiv(handle, OpenGL.INFO_LOG_LENGTH, &log_length)
 	if status == 0 {
-		// fprintf(stderr, "ERROR: ImGui_ImplOpenGL3_CreateDeviceObjects: failed to link %s! With GLSL %s\n", desc, bd->GlslVersionString);
+		fmt.printfln("ERROR: ImGui_ImplOpenGL3_CreateDeviceObjects: failed to link %s! With GLSL %s", desc, cstring(&bd.GlslVersionString[0]))
 	}
 	if log_length > 1 {
 		buf := imgui.NewVector(u8)
 		imgui.VectorResize(&buf, log_length + 1)
-		OpenGL.GetShaderInfoLog(handle, log_length, nil, imgui.VectorBegin(buf))
-		// fprintf(stderr, "%s\n", buf.begin());
+		OpenGL.GetProgramInfoLog(handle, log_length, nil, imgui.VectorBegin(buf))
+		fmt.printfln(string(buf.Data[:buf.Size]))
 	}
 	return status != 0
 }

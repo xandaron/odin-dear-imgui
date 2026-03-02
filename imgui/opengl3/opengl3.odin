@@ -89,7 +89,7 @@ Init :: proc(glsl_version: cstring = nil, allocator := context.allocator) -> boo
 		}
 	}
 	assert(len(glsl_version) + 2 < len(bd.GlslVersionString))
-	mem.copy(&bd.GlslVersionString, &glsl_version, len(glsl_version))
+	mem.copy(&bd.GlslVersionString, rawptr(glsl_version), len(glsl_version))
 	bd.GlslVersionString[len(glsl_version)] = '\n'
 
 	// Detect extensions we support
@@ -130,7 +130,7 @@ NewFrame :: proc() {
 	bd := GetBackendData()
 	assert(bd != nil, "Context or backend not initialized! Did you call Init()?")
 
-	if bd.ShaderHandle != 0 {
+	if bd.ShaderHandle == 0 {
 		if !CreateDeviceObjects() {
 			panic("CreateDeviceObjects() failed!")
 		}
@@ -229,8 +229,8 @@ RenderDrawData :: proc(draw_data: ^imgui.DrawData) {
 		// - We are now back to using exclusively glBufferData(). So bd->UseBufferSubData IS ALWAYS FALSE in this code.
 		//   We are keeping the old code path for a while in case people finding new issues may want to test the bd->UseBufferSubData path.
 		// - See https://github.com/ocornut/imgui/issues/4468 and please report any corruption issues.
-		vtx_buffer_size := draw_list.VtxBuffer.Size * size_of(imgui.DrawVert)
-		idx_buffer_size := draw_list.IdxBuffer.Size * size_of(imgui.DrawIdx)
+		vtx_buffer_size := imgui.VectorSizeInBytes(draw_list.VtxBuffer)
+		idx_buffer_size := imgui.VectorSizeInBytes(draw_list.IdxBuffer)
 		if bd.UseBufferSubData {
 			if bd.VertexBufferSize < int(vtx_buffer_size) {
 				bd.VertexBufferSize = int(vtx_buffer_size)
@@ -441,113 +441,21 @@ CreateDeviceObjects :: proc() -> bool {
 		}
 	}
 
-	vertex_shader_glsl_120: cstring = `
-uniform mat4 ProjMtx;
-attribute vec2 Position;
-attribute vec2 UV;
-attribute vec4 Color;
-varying vec2 Frag_UV;
-varying vec4 Frag_Color;
-void main()
-{
-    Frag_UV = UV;
-    Frag_Color = Color;
-    gl_Position = ProjMtx * vec4(Position.xy,0,1);
-}
-`
+	vertex_shader_glsl_120: cstring = "\nuniform mat4 ProjMtx;attribute vec2 Position;attribute vec2 UV;attribute vec4 Color;varying vec2 Frag_UV;varying vec4 Frag_Color;void main(){Frag_UV = UV;Frag_Color = Color;gl_Position = ProjMtx * vec4(Position.xy,0,1);}"
 
-	vertex_shader_glsl_130: cstring = `
-uniform mat4 ProjMtx;
-in vec2 Position;
-in vec2 UV;
-in vec4 Color;
-out vec2 Frag_UV;
-out vec4 Frag_Color;
-void main()
-{
-    Frag_UV = UV;
-    Frag_Color = Color;
-    gl_Position = ProjMtx * vec4(Position.xy,0,1);
-}
-`
+	vertex_shader_glsl_130: cstring = "\nuniform mat4 ProjMtx;in vec2 Position;in vec2 UV;in vec4 Color;out vec2 Frag_UV;out vec4 Frag_Color;void main(){Frag_UV = UV;Frag_Color = Color;gl_Position = ProjMtx * vec4(Position.xy,0,1);}"
 
-	vertex_shader_glsl_300_es: cstring = `
-precision highp float;
-layout (location = 0) in vec2 Position;
-layout (location = 1) in vec2 UV;
-layout (location = 2) in vec4 Color;
-uniform mat4 ProjMtx;
-out vec2 Frag_UV;
-out vec4 Frag_Color;
-void main()
-{
-    Frag_UV = UV;
-    Frag_Color = Color;
-    gl_Position = ProjMtx * vec4(Position.xy,0,1);
-}
-`
+	vertex_shader_glsl_300_es: cstring = "\nprecision highp float;layout (location = 0) in vec2 Position;layout (location = 1) in vec2 UV;layout (location = 2) in vec4 Color;uniform mat4 ProjMtx;out vec2 Frag_UV;out vec4 Frag_Color;void main(){Frag_UV = UV;Frag_Color = Color;gl_Position = ProjMtx * vec4(Position.xy,0,1);}"
 
-	vertex_shader_glsl_410_core: cstring = `
-layout (location = 0) in vec2 Position;
-layout (location = 1) in vec2 UV;
-layout (location = 2) in vec4 Color;
-uniform mat4 ProjMtx;
-out vec2 Frag_UV;
-out vec4 Frag_Color;
-void main()
-{
-    Frag_UV = UV;
-    Frag_Color = Color;
-    gl_Position = ProjMtx * vec4(Position.xy,0,1);
-}
-`
+	vertex_shader_glsl_410_core: cstring = "\nlayout (location = 0) in vec2 Position;layout (location = 1) in vec2 UV;layout (location = 2) in vec4 Color;uniform mat4 ProjMtx;out vec2 Frag_UV;out vec4 Frag_Color;void main(){Frag_UV = UV;Frag_Color = Color;gl_Position = ProjMtx * vec4(Position.xy,0,1);}"
 
-	fragment_shader_glsl_120: cstring = `
-"#ifdef GL_ES\n"
-"    precision mediump float;\n"
-"#endif\n"
-"uniform sampler2D Texture;\n"
-"varying vec2 Frag_UV;\n"
-"varying vec4 Frag_Color;\n"
-"void main()\n"
-"{\n"
-"    gl_FragColor = Frag_Color * texture2D(Texture, Frag_UV.st);\n"
-"}\n";
-`
+	fragment_shader_glsl_120: cstring = "\n#ifdef GL_ES\nprecision mediump float;\n#endif\nuniform sampler2D Texture;varying vec2 Frag_UV;varying vec4 Frag_Color;void main(){gl_FragColor = Frag_Color * texture2D(Texture, Frag_UV.st);}"
 
-	fragment_shader_glsl_130: cstring = `
-uniform sampler2D Texture;
-in vec2 Frag_UV;
-in vec4 Frag_Color;
-out vec4 Out_Color;
-void main()
-{
-    Out_Color = Frag_Color * texture(Texture, Frag_UV.st);
-}
-`
+	fragment_shader_glsl_130: cstring = "\nuniform sampler2D Texture;in vec2 Frag_UV;in vec4 Frag_Color;out vec4 Out_Color;void main(){Out_Color = Frag_Color * texture(Texture, Frag_UV.st);}"
 
-	fragment_shader_glsl_300_es: cstring = `
-precision mediump float;
-uniform sampler2D Texture;
-in vec2 Frag_UV;
-in vec4 Frag_Color;
-layout (location = 0) out vec4 Out_Color;
-void main()
-{
-    Out_Color = Frag_Color * texture(Texture, Frag_UV.st);
-}
-`
+	fragment_shader_glsl_300_es: cstring = "\nprecision mediump float;uniform sampler2D Texture;in vec2 Frag_UV;in vec4 Frag_Color;layout (location = 0) out vec4 Out_Color;void main(){Out_Color = Frag_Color * texture(Texture, Frag_UV.st);}"
 
-	fragment_shader_glsl_410_core: cstring = `
-in vec2 Frag_UV;
-in vec4 Frag_Color;
-uniform sampler2D Texture;
-layout (location = 0) out vec4 Out_Color;
-void main()
-{
-    Out_Color = Frag_Color * texture(Texture, Frag_UV.st);
-}
-`
+	fragment_shader_glsl_410_core: cstring = "\nin vec2 Frag_UV;in vec4 Frag_Color;uniform sampler2D Texture;layout (location = 0) out vec4 Out_Color;void main(){Out_Color = Frag_Color * texture(Texture, Frag_UV.st);}"
 
 	// Select shaders matching our GLSL versions
 	vertex_shader: cstring
